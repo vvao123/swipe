@@ -2,79 +2,86 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity"
-    android:id="@+id/main"
-    android:background="@color/teal_700">
+    android:background="@color/teal_700"
+    tools:context=".MainActivity">
 
     <RelativeLayout
-        android:layout_height="match_parent"
-        android:layout_width="match_parent">
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
         <TextView
             android:id="@+id/up"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to top"
+            android:layout_height="match_parent"
+            android:layout_marginTop="50dp"
             android:gravity="center|top"
-            android:layout_marginTop="50dp"/>
+            android:text="to top" />
+
         <TextView
             android:id="@+id/topRight"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to top right"
-            android:gravity="right|top"
+            android:layout_height="match_parent"
             android:layout_marginTop="50dp"
-            android:layout_marginRight="20dp"/>
+            android:layout_marginRight="20dp"
+            android:gravity="right|top"
+            android:text="to top right" />
+
         <TextView
             android:id="@+id/right"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to right"
+            android:layout_height="match_parent"
+            android:layout_marginRight="20dp"
             android:gravity="right|center"
-            android:layout_marginRight="20dp"/>
+            android:text="to right" />
+
         <TextView
             android:id="@+id/bottomRight"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to bottom right"
-            android:gravity="right|bottom"
+            android:layout_height="match_parent"
             android:layout_marginRight="20dp"
-            android:layout_marginBottom="50dp"/>
+            android:layout_marginBottom="50dp"
+            android:gravity="right|bottom"
+            android:text="to bottom right" />
+
         <TextView
             android:id="@+id/down"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to bottom"
+            android:layout_height="match_parent"
+            android:layout_marginBottom="50dp"
             android:gravity="bottom|center"
-            android:layout_marginBottom="50dp"/>
+            android:text="to bottom" />
+
         <TextView
             android:id="@+id/bottomLeft"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to bottom left"
-            android:gravity="bottom|left"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="20dp"
             android:layout_marginBottom="50dp"
-            android:layout_marginLeft="20dp"/>
+            android:gravity="bottom|left"
+            android:text="to bottom left" />
+
         <TextView
             android:id="@+id/left"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to left"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="20dp"
             android:gravity="center|left"
-            android:layout_marginLeft="20dp"/>
+            android:text="to left" />
+
         <TextView
             android:id="@+id/topLeft"
-            android:layout_height="match_parent"
             android:layout_width="match_parent"
-            android:text="to top left"
-            android:gravity="left|top"
+            android:layout_height="match_parent"
+            android:layout_marginLeft="20dp"
             android:layout_marginTop="50dp"
-            android:layout_marginLeft="20dp"/>
+            android:gravity="left|top"
+            android:text="to top left" />
 
     </RelativeLayout>
-    
+
     <TextView
         android:id="@+id/swipe"
         android:layout_width="wrap_content"
@@ -90,11 +97,30 @@
         android:id="@+id/button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Export Data"
+        android:backgroundTint="@android:color/holo_blue_light"
         android:onClick="export"
+        android:text="Export Data"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        android:backgroundTint="@android:color/holo_blue_light"/>
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/button2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:onClick="train"
+        android:text="train"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/button"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/button4"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Button"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/button" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

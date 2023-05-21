@@ -16,6 +16,10 @@ import android.view.VelocityTracker;
 import android.view.View;
 import android.widget.TextView;
 
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
+
 import com.example.swipeauth.databinding.ActivityMainBinding;
 
 import java.io.File;
@@ -76,6 +80,14 @@ public class MainActivity extends AppCompatActivity {
 
         View mContent = binding.main;
         swipeText = binding.swipe;
+
+        // test embed python
+//        if (!Python.isStarted()){
+//            Python.start(new AndroidPlatform(this));
+//        }
+//        Python python=Python.getInstance();
+//        PyObject pyObject=python.getModule("testoutput");
+//        pyObject.callAttr("sayHello");
 
         text1 = binding.up;
         text2 = binding.topRight;
@@ -411,6 +423,15 @@ public class MainActivity extends AppCompatActivity {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
 
+    public void train(View view) {
+        if (!Python.isStarted()){
+            Python.start(new AndroidPlatform(this));
+        }
+        Python python=Python.getInstance();
+        PyObject pyObject=python.getModule("authpy");
+        pyObject.callAttr("train");
+
+    }
     public void export(View view) {
 
         StringBuilder data = new StringBuilder();
@@ -434,7 +455,8 @@ public class MainActivity extends AppCompatActivity {
         } while (actions[count] != null);
 
         try {
-            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+//            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+            File file = new File(getFilesDir(), "training.csv");
             FileOutputStream out = new FileOutputStream(file);
             out.write(data.toString().getBytes());
             out.close();
