@@ -28,9 +28,46 @@ import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothSocket;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.InputStream;
+import java.util.UUID;
+
 
 public class MainActivity extends AppCompatActivity {
 
+// bluetooth part
+    private static final String TAG = "MainActivity";
+    private static final UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"); // Same as in your Bluetooth device documentation
+    private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothSocket socket;
+    private BluetoothDevice mBluetoothDevice;
+    private OutputStream outputStream;
+    private InputStream inputStream;
+    private String deviceAddress = "00:00:00:00:00:00"; // Replace with your device's address
+    private BluetoothAdapter bluetoothAdapter;
+    private AcceptThread acceptThread;
+    private ConnectedThread connectedThread;
+    private static final int MY_PERMISSIONS_REQUEST_BLUETOOTH_CONNECT = 1;
+    private Handler handler;
+//
     // Data storage
     static final int DATA_COUNT = 80;
     static final int DATA_ENTRIES = 10000;
@@ -103,6 +140,34 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this,
                     new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0);
         }
+        // Create and start the accept thread.
+        bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{android.Manifest.permission.BLUETOOTH_CONNECT},
+                    MY_PERMISSIONS_REQUEST_BLUETOOTH_CONNECT);
+        } else {
+            acceptThread = new AcceptThread(this);
+            acceptThread.start();
+        }
+        handler = new Handler(Looper.getMainLooper()) {
+            @Override
+            public void handleMessage(Message msg) {
+                switch (msg.what) {
+                    case 0:  // 对应ConnectedThread中MESSAGE_READ
+                        byte[] readBuf = (byte[]) msg.obj;
+
+                        // construct a string from the valid bytes in the buffer
+                        String readMessage = new String(readBuf, 0, msg.arg1);
+//                        messageTextView.setText(readMessage);
+                        break;
+                    // ... 可以添加更多的case来处理其他类型的消息 ...
+                }
+            }
+        };
+//
+
 
         com.example.swipeauth.databinding.ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -316,6 +381,179 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // Make sure to cleanup when the activity is destroyed.
+        if (acceptThread != null) {
+            acceptThread.cancel();
+        }
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == MY_PERMISSIONS_REQUEST_BLUETOOTH_CONNECT) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                acceptThread = new AcceptThread(this);
+                acceptThread.start();
+            } else {
+                // Permission denied. Handle appropriately.
+            }
+        }
+    }
+    private void sendMessage(String message) {
+        if (outputStream != null) {
+            try {
+                outputStream.write(message.getBytes());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    private class AcceptThread extends Thread {
+        private Context context;
+        private final BluetoothServerSocket mmServerSocket;
+
+        public AcceptThread(Context context) {
+            this.context = context;
+            BluetoothServerSocket tmp = null;
+            try {
+                // Use a well-known UUID for this application.
+                UUID MY_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+//                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+//                    // TODO: Consider calling
+//                    //    ActivityCompat#requestPermissions
+//                    // here to request the missing permissions, and then overriding
+//                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+//                    //                                          int[] grantResults)
+//                    // to handle the case where the user grants the permission. See the documentation
+//                    // for ActivityCompat#requestPermissions for more details.
+//                    return TODO;
+//                }
+                tmp = bluetoothAdapter.listenUsingInsecureRfcommWithServiceRecord("My App", MY_UUID);
+            } catch (IOException e) {
+                Log.e(TAG, "Socket's listen() method failed", e);
+            }
+            mmServerSocket = tmp;
+        }
+
+        public void run() {
+            BluetoothSocket socket = null;
+            while (true) {
+                try {
+                    socket = mmServerSocket.accept();
+                } catch (IOException e) {
+                    Log.e(TAG, "Socket's accept() method failed", e);
+                    break;
+                }
+
+                if (socket != null) {
+                    manageMyConnectedSocket(socket);
+//                    new ConnectedThread(socket).start();
+//                    Message msg = handler.obtainMessage(1, socket);
+//                    handler.sendMessage(msg);
+                    try {
+                        mmServerSocket.close();
+                    } catch (IOException e) {
+                        Log.e(TAG, "Could not close the server socket", e);
+                    }
+                    break;
+                }
+            }
+        }
+
+        public void cancel() {
+            try {
+                mmServerSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the connect socket", e);
+            }
+        }
+    }
+    private class ConnectedThread extends Thread {
+        private final BluetoothSocket mmSocket;
+        private final InputStream mmInStream;
+        private final OutputStream mmOutStream;
+        private byte[] mmBuffer; // mmBuffer store for the stream
+
+        public ConnectedThread(BluetoothSocket socket) {
+            mmSocket = socket;
+            InputStream tmpIn = null;
+            OutputStream tmpOut = null;
+
+            // Get the input and output streams; using temp objects because
+            // member streams are final.
+            try {
+                tmpIn = socket.getInputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating input stream", e);
+            }
+            try {
+                tmpOut = socket.getOutputStream();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when creating output stream", e);
+            }
+
+            mmInStream = tmpIn;
+            mmOutStream = tmpOut;
+        }
+
+        public void run() {
+            mmBuffer = new byte[1024];
+            int numBytes; // bytes returned from read()
+
+            // Keep listening to the InputStream until an exception occurs.
+            while (true) {
+                try {
+                    // Read from the InputStream.
+                    numBytes = mmInStream.read(mmBuffer);
+                    // Send the obtained bytes to the UI activity.
+                    Message readMsg = handler.obtainMessage(
+                            0, numBytes, -1,
+                            mmBuffer);
+                    readMsg.sendToTarget();
+                } catch (IOException e) {
+                    Log.d(TAG, "Input stream was disconnected", e);
+                    break;
+                }
+            }
+        }
+        // Call this from the main activity to send data to the remote device.
+        public void write(byte[] bytes) {
+            try {
+                mmOutStream.write(bytes);
+
+                // Share the sent message with the UI activity.
+                Message writtenMsg = handler.obtainMessage(
+                        1, -1, -1, mmBuffer);
+                writtenMsg.sendToTarget();
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred when sending data", e);
+
+                // Send a failure message back to the activity.
+                Message writeErrorMsg =
+                        handler.obtainMessage(2);
+                Bundle bundle = new Bundle();
+                bundle.putString("toast",
+                        "Couldn't send data to the other device");
+                writeErrorMsg.setData(bundle);
+                handler.sendMessage(writeErrorMsg);
+            }
+        }
+
+
+
+        // Call this method from the main activity to shut down the connection.
+        public void cancel() {
+            try {
+                mmSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Could not close the connect socket", e);
+            }
+        }
+    }
 
     // Calculate swipe angles
     public Direction getDirection(float x1, float y1, float x2, float y2){
@@ -503,16 +741,23 @@ public class MainActivity extends AppCompatActivity {
         System.out.println(result.toString());
         if( result.toString().equals("[1]")){
             swipeText.setText("success");
+            sendData("success\n");
 
         }
         else{
             swipeText.setText("denied");
+            sendData("denied\n");
+
         }
-
-
-
-
-
+    }
+    public void sendData(String data) {
+        if (connectedThread != null) {
+            connectedThread.write(data.getBytes());
+        }
+    }
+    private void manageMyConnectedSocket(BluetoothSocket socket) {
+        connectedThread = new ConnectedThread(socket);
+        connectedThread.start();
     }
     public void export(View view) {
         String username = usernameEditText.getText().toString();

@@ -94,7 +94,7 @@
             android:layout_marginBottom="612dp"
             android:ems="10"
             android:inputType="textPersonName"
-            android:text="please iinput user id" />
+            android:text="please input user id" />
 
     </RelativeLayout>
 
