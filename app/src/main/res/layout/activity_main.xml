@@ -80,6 +80,22 @@
             android:gravity="left|top"
             android:text="to top left" />
 
+        <EditText
+            android:id="@+id/useidtext"
+            android:layout_width="212dp"
+            android:layout_height="63dp"
+            android:layout_alignStart="@+id/bottomLeft"
+            android:layout_alignEnd="@+id/bottomRight"
+            android:layout_alignBottom="@+id/bottomRight"
+            android:layout_alignParentTop="true"
+            android:layout_marginStart="92dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="67dp"
+            android:layout_marginBottom="612dp"
+            android:ems="10"
+            android:inputType="textPersonName"
+            android:text="please iinput user id" />
+
     </RelativeLayout>
 
     <TextView
@@ -118,7 +134,8 @@
         android:id="@+id/button4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Button"
+        android:onClick="authenticate"
+        android:text="test"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/button" />

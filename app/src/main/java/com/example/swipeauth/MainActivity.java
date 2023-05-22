@@ -14,6 +14,7 @@ import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import com.chaquo.python.PyObject;
@@ -46,6 +47,32 @@ public class MainActivity extends AppCompatActivity {
 
     List<Double> velocity = new ArrayList<>();
 
+    int dataCount = 0;
+    int moveIndex = 0;
+    int touchIndex = 0;
+
+    // Times
+    long start;
+    long end;
+
+    // Coords
+    int startX = 0;
+    int startY = 0;
+    int endX = 0;
+    int endY = 0;
+
+    // Direction counts
+    int c1;
+    int c2;
+    int c3;
+    int c4;
+    int c5;
+    int c6;
+    int c7;
+    int c8;
+
+    boolean isauthen=false;
+
 
 //    List<String> directionLable = new ArrayList<>();
 
@@ -60,6 +87,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView text6;
     private TextView text7;
     private TextView text8;
+
+    private EditText usernameEditText;
 
     private VelocityTracker mVelocityTracker = null;
 
@@ -80,6 +109,8 @@ public class MainActivity extends AppCompatActivity {
 
         View mContent = binding.main;
         swipeText = binding.swipe;
+        usernameEditText = findViewById(R.id.useidtext);
+
 
         // test embed python
 //        if (!Python.isStarted()){
@@ -99,29 +130,7 @@ public class MainActivity extends AppCompatActivity {
         text8 = binding.topLeft;
 
         mContent.setOnTouchListener(new View.OnTouchListener() {
-            int dataCount = 0;
-            int moveIndex = 0;
-            int touchIndex = 0;
 
-            // Times
-            long start;
-            long end;
-
-            // Coords
-            int startX = 0;
-            int startY = 0;
-            int endX = 0;
-            int endY = 0;
-
-            // Direction counts
-            int c1;
-            int c2;
-            int c3;
-            int c4;
-            int c5;
-            int c6;
-            int c7;
-            int c8;
 
             @SuppressLint("SetTextI18n")
             @Override
@@ -422,31 +431,50 @@ public class MainActivity extends AppCompatActivity {
     public double calculateDistance(int x1, int y1, int x2, int y2) {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
+    public void rest(){
+        // reset
+        dataCount = 0;
+        moveIndex = 0;
+        touchIndex = 0;
+        actions = new String[DATA_ENTRIES];
+        touchIndices = new int[DATA_ENTRIES];
+        directions = new String[DATA_ENTRIES];
+        durations = new Long[DATA_ENTRIES];
+
+        timeStamp.clear();
+        pressures.clear();
+        fingerSizes.clear();
+        coordX.clear();
+        coordY.clear();
+    }
+
 
     public void train(View view) {
+        String username = usernameEditText.getText().toString();
         if (!Python.isStarted()){
             Python.start(new AndroidPlatform(this));
         }
         Python python=Python.getInstance();
         PyObject pyObject=python.getModule("authpy");
-        pyObject.callAttr("train");
+        pyObject.callAttr("train",username);
+        rest();
+
+
+
 
     }
-    public void export(View view) {
-
+    public void authenticate(View view) {
+        String username = usernameEditText.getText().toString();
         StringBuilder data = new StringBuilder();
         int count = 0;
         int i = touchIndices[count];
-
         data.append(directions[i]).append(",");
         data.append(durations[i]).append(",");
-
         do {
             int temp = touchIndices[count];
 
             data.append(pressures.get(count)).append(",").
                     append(fingerSizes.get(count)).append(",");
-
             count++;
             if (temp != touchIndices[count] && actions[count] != null) {
                 i = touchIndices[count];
@@ -456,29 +484,62 @@ public class MainActivity extends AppCompatActivity {
 
         try {
 //            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
-            File file = new File(getFilesDir(), "training.csv");
+            File file = new File(getFilesDir(), username+"authen.csv");
             FileOutputStream out = new FileOutputStream(file);
             out.write(data.toString().getBytes());
             out.close();
 
-//            //Saving data to file
-//            FileOutputStream out = openFileOutput("training.csv", Context.MODE_PRIVATE);
-//            out.write(data.toString().getBytes());
-//            out.close();
-//
-//            //Exporting
-//            Context context = getApplicationContext();
-//            File fileLocation = new File(getFilesDir(), "training.csv");
-//            Uri path = FileProvider.getUriForFile(context, "com.example.swipeauth.fileProvider", fileLocation);
-//            Intent fileIntent = new Intent(Intent.ACTION_SEND);
-//
-//            fileIntent.setType("text/csv");
-//            fileIntent.putExtra(Intent.EXTRA_SUBJECT, "training");
-//            fileIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-//            fileIntent.putExtra(Intent.EXTRA_STREAM, path);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        rest();
 
-//            Intent shareIntent = Intent.createChooser(fileIntent, null);
-//            startActivity(shareIntent);
+        if (!Python.isStarted()){
+            Python.start(new AndroidPlatform(this));
+        }
+        Python python=Python.getInstance();
+        PyObject pyObject=python.getModule("doauth");
+        PyObject result=pyObject.callAttr("doau",username);
+        System.out.println(result.toString());
+        if( result.toString().equals("[1]")){
+            swipeText.setText("success");
+
+        }
+        else{
+            swipeText.setText("denied");
+        }
+
+
+
+
+
+    }
+    public void export(View view) {
+        String username = usernameEditText.getText().toString();
+        StringBuilder data = new StringBuilder();
+        int count = 0;
+        int i = touchIndices[count];
+        data.append(directions[i]).append(",");
+        data.append(durations[i]).append(",");
+        do {
+            int temp = touchIndices[count];
+
+            data.append(pressures.get(count)).append(",").
+                    append(fingerSizes.get(count)).append(",");
+            count++;
+            if (temp != touchIndices[count] && actions[count] != null) {
+                i = touchIndices[count];
+                data.append("\n").append(directions[i]).append(",").append(durations[i]).append(",");
+            }
+        } while (actions[count] != null);
+
+        try {
+
+//            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+            File file = new File(getFilesDir(), username+"training.csv");
+            FileOutputStream out = new FileOutputStream(file);
+            out.write(data.toString().getBytes());
+            out.close();
 
         } catch (Exception e) {
             e.printStackTrace();
