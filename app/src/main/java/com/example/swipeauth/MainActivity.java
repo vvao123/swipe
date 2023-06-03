@@ -3,8 +3,12 @@ package com.example.swipeauth;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.view.WindowInsetsCompat;
 
+import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Environment;
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -14,6 +18,8 @@ import android.os.Bundle;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
+import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 import android.widget.EditText;
 import android.widget.TextView;
 
@@ -26,6 +32,7 @@ import com.example.swipeauth.databinding.ActivityMainBinding;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import android.bluetooth.BluetoothAdapter;
@@ -134,18 +141,18 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // acquire permission to save
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
 
             ActivityCompat.requestPermissions(this,
-                    new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0);
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0);
         }
         // Create and start the accept thread.
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{android.Manifest.permission.BLUETOOTH_CONNECT},
+                    new String[]{Manifest.permission.BLUETOOTH_CONNECT},
                     MY_PERMISSIONS_REQUEST_BLUETOOTH_CONNECT);
         } else {
             acceptThread = new AcceptThread(this);
@@ -169,12 +176,27 @@ public class MainActivity extends AppCompatActivity {
 //
 
 
-        com.example.swipeauth.databinding.ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
+        ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         View mContent = binding.main;
         swipeText = binding.swipe;
         usernameEditText = findViewById(R.id.useidtext);
+//exclude  edgeswipe back gesture
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//            mContent.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+//                @Override
+//                public void onGlobalLayout() {
+//                    mContent.requestFocus()
+//                    mContent.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+//                    List<Rect> exclusionRects = new ArrayList<>();
+//                    exclusionRects.add(new Rect(0, 0, mContent.getWidth(), mContent.getHeight()));
+//                    System.out.println("!!!");
+//                    System.out.println(mContent.getWidth());
+//                    mContent.setSystemGestureExclusionRects(exclusionRects);
+//                }
+//            });
+//        }
 
 
         // test embed python
@@ -262,7 +284,7 @@ public class MainActivity extends AppCompatActivity {
 
                         // Action check
                         System.out.println("Move");
-                        actions[moveIndex] = "Move";
+
 
                         // End time for each interval
 //                        end = System.currentTimeMillis();
@@ -285,10 +307,6 @@ public class MainActivity extends AppCompatActivity {
                         // Log velocity of pixels per second
                         // Best practice to use VelocityTrackerCompat where possible.
 
-                        // Count
-                        touchIndices[moveIndex] = touchIndex;
-                        moveIndex++;
-
                         break;
 
                     case MotionEvent.ACTION_UP:
@@ -296,6 +314,7 @@ public class MainActivity extends AppCompatActivity {
 
 //                        System.out.println(velocity.size());
                         System.out.println(pressures.size());
+                        System.out.println(fingerSizes.size());
                         System.out.println(moveIndex);
                         System.out.println(touchIndex);
                         if(validation(c1, c2, c4, c4, c5, c6, c7, c8)) {
@@ -622,15 +641,21 @@ public class MainActivity extends AppCompatActivity {
         System.out.printf("pointerCount:%d",pointerCount);
         mVelocityTracker.addMovement(ev);
         for (int h = 0; h < historySize; h++) {
-            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
+//            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
 
             for (int p = 0; p < pointerCount; p++) {
-                System.out.printf("  pressure: (%f)|  ",
-                        ev.getHistoricalPressure(p, h));
+//                System.out.printf("  pressure: (%f)|  ",
+//                        ev.getHistoricalPressure(p, h));
                 pressures.add((double) ev.getHistoricalPressure(p, h));
                 fingerSizes.add((double) ev.getHistoricalSize(p, h));
                 int curX=(int) ev.getHistoricalX(p, h);
                 int curY=(int) ev.getHistoricalY(p, h);
+                if(curX>500){
+                    System.out.println("right");
+                }
+                else{
+                    System.out.println("left");
+                }
                 if(timeStamp.size()>0){
                     //not the first point calculate velocity
                     double distance= calculateDistance(getLastElement(coordX),curX,getLastElement(coordY),curY);
@@ -641,14 +666,16 @@ public class MainActivity extends AppCompatActivity {
                 timeStamp.add(ev.getHistoricalEventTime(h));
                 coordX.add(curX);
                 coordY.add(curY);
+                actions[moveIndex] = "Move";
+                touchIndices[moveIndex] = touchIndex;
+                moveIndex++;
 
             }
         }
         System.out.printf("At time %d:", ev.getEventTime());
 
         for (int p = 0; p < pointerCount; p++) {
-            System.out.printf("  pressure: (%f)|  ",
-                    ev.getPressure(p));
+//            System.out.printf("  pressure: (%f)|  ", ev.getPressure(p));
             pressures.add((double) ev.getPressure(p));
             fingerSizes.add((double) ev.getSize(p));
             double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
@@ -657,6 +684,17 @@ public class MainActivity extends AppCompatActivity {
             timeStamp.add(ev.getEventTime());
             coordX.add((int) ev.getX(p));
             coordY.add((int) ev.getY(p));
+            actions[moveIndex] = "Move";
+            touchIndices[moveIndex] = touchIndex;
+            moveIndex++;
+
+//            if((int) ev.getX(p)>500){
+//                System.out.println("right");
+//            }
+//            else{
+//                System.out.println("left");
+//            }
+
         }
     }
 
@@ -760,23 +798,32 @@ public class MainActivity extends AppCompatActivity {
         connectedThread.start();
     }
     public void export(View view) {
+
         String username = usernameEditText.getText().toString();
         StringBuilder data = new StringBuilder();
         int count = 0;
+        int count4press=0; //after modify, pressure and moveIndices has different index
         int i = touchIndices[count];
         data.append(directions[i]).append(",");
         data.append(durations[i]).append(",");
-        do {
-            int temp = touchIndices[count];
+        count=1; // start from 1
 
-            data.append(pressures.get(count)).append(",").
-                    append(fingerSizes.get(count)).append(",");
-            count++;
-            if (temp != touchIndices[count] && actions[count] != null) {
+        while(true) {
+            int temp = touchIndices[count];
+            if(actions[count] == "UP"){
                 i = touchIndices[count];
                 data.append("\n").append(directions[i]).append(",").append(durations[i]).append(",");
+                count++;
+                if(actions[count]==null)
+                    break;
+                count++; //skip "DOWN" aciton
+                continue;
             }
-        } while (actions[count] != null);
+            data.append(pressures.get(count4press)).append(",").
+                    append(fingerSizes.get(count4press)).append(",");
+            count++;
+            count4press++;
+        };
 
         try {
 
