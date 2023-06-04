@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
 //
     // Data storage
     static final int DATA_COUNT = 80;
-    static final int DATA_ENTRIES = 10000;
+    static final int DATA_ENTRIES = 100000;
     String[] actions = new String[DATA_ENTRIES];
     int[] touchIndices = new int[DATA_ENTRIES];
     String[] directions = new String[DATA_ENTRIES];
@@ -116,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
     int c8;
 
     boolean isauthen=false;
+    String readMessage;
 
 
 //    List<String> directionLable = new ArrayList<>();
@@ -166,8 +167,8 @@ public class MainActivity extends AppCompatActivity {
                         byte[] readBuf = (byte[]) msg.obj;
 
                         // construct a string from the valid bytes in the buffer
-                        String readMessage = new String(readBuf, 0, msg.arg1);
-//                        messageTextView.setText(readMessage);
+                        readMessage = new String(readBuf, 0, msg.arg1);
+                        text1.setText(readMessage);
                         break;
                     // ... 可以添加更多的case来处理其他类型的消息 ...
                 }
@@ -218,7 +219,6 @@ public class MainActivity extends AppCompatActivity {
 
         mContent.setOnTouchListener(new View.OnTouchListener() {
 
-
             @SuppressLint("SetTextI18n")
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -268,6 +268,7 @@ public class MainActivity extends AppCompatActivity {
                         // Count
                         touchIndices[moveIndex] = touchIndex;
                         moveIndex++;
+                        sendData("0.0\n");
 
                         break;
 
@@ -275,7 +276,7 @@ public class MainActivity extends AppCompatActivity {
                     case MotionEvent.ACTION_MOVE:
                         if(dataCount == DATA_COUNT) {
                             swipeText.setText("Finished collecting\nPlease export data");
-                            break;
+//                            break;
                         }
                         else
                             swipeText.setText("Swiping...");
@@ -310,6 +311,7 @@ public class MainActivity extends AppCompatActivity {
                         break;
 
                     case MotionEvent.ACTION_UP:
+
                         System.out.println(start);
 
 //                        System.out.println(velocity.size());
@@ -317,7 +319,7 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println(fingerSizes.size());
                         System.out.println(moveIndex);
                         System.out.println(touchIndex);
-                        if(validation(c1, c2, c4, c4, c5, c6, c7, c8)) {
+                        if(false) {
                             swipeText.setText("Finished collecting\nPlease export data");
 
                             break;
@@ -344,38 +346,38 @@ public class MainActivity extends AppCompatActivity {
                         Direction direction = getDirection(startX, startY, endX, endY);
                         directions[touchIndex] = direction.toString();
 
-                        if (direction == Direction.down_up){
-                            c1++;
-                            text1.setText("to top " + c1);
-                        }
-                        else if (direction == Direction.bottomLeft_topRight) {
-                            c2++;
-                            text2.setText("to top right " + c2);
-                        }
-                        else if (direction == Direction.left_right) {
-                            c3++;
-                            text3.setText("to right " + c3);
-                        }
-                        else if (direction == Direction.topLeft_bottomRight) {
-                            c4++;
-                            text4.setText("to bottom right " + c4);
-                        }
-                        else if (direction == Direction.up_down) {
-                            c5++;
-                            text5.setText("to bottom " + c5);
-                        }
-                        else if (direction == Direction.topRight_bottomLeft) {
-                            c6++;
-                            text6.setText("to bottom left " + c6);
-                        }
-                        else if (direction == Direction.right_left) {
-                            c7++;
-                            text7.setText("to left " + c7);
-                        }
-                        else if (direction == Direction.bottomRight_topLeft) {
-                            c8++;
-                            text8.setText("to top left " + c8);
-                        }
+//                        if (direction == Direction.down_up){
+//                            c1++;
+//                            text1.setText("to top " + c1);
+//                        }
+//                        else if (direction == Direction.bottomLeft_topRight) {
+//                            c2++;
+//                            text2.setText("to top right " + c2);
+//                        }
+//                        else if (direction == Direction.left_right) {
+//                            c3++;
+//                            text3.setText("to right " + c3);
+//                        }
+//                        else if (direction == Direction.topLeft_bottomRight) {
+//                            c4++;
+//                            text4.setText("to bottom right " + c4);
+//                        }
+//                        else if (direction == Direction.up_down) {
+//                            c5++;
+//                            text5.setText("to bottom " + c5);
+//                        }
+//                        else if (direction == Direction.topRight_bottomLeft) {
+//                            c6++;
+//                            text6.setText("to bottom left " + c6);
+//                        }
+//                        else if (direction == Direction.right_left) {
+//                            c7++;
+//                            text7.setText("to left " + c7);
+//                        }
+//                        else if (direction == Direction.bottomRight_topLeft) {
+//                            c8++;
+//                            text8.setText("to top left " + c8);
+//                        }
 
 //                        // Finger size
 //                        fingerSizes[moveIndex] = motionEvent.getSize();
@@ -387,12 +389,28 @@ public class MainActivity extends AppCompatActivity {
                         touchIndices[moveIndex] = touchIndex;
                         moveIndex++;
                         touchIndex++;
+                        System.out.println("before loop");
+                        System.out.println(readMessage);
+                        readMessage="tmp";
+                        while(true){
+                            sendData("0.00\n");
+                            System.out.println(readMessage);
+                            if(readMessage!=null &&readMessage.equals("0.00")){
+                                break;
+                            }
+
+                        }
+                        readMessage="tmp";
 
                         break;
 
                     case MotionEvent.ACTION_CANCEL:
                         // Return a VelocityTracker object back to be re-used by others.
                         mVelocityTracker.recycle();
+                        sendData("0.0\n");
+                        break;
+                    default:
+                        sendData("0.0\n");
                         break;
 
                 }
@@ -529,6 +547,7 @@ public class MainActivity extends AppCompatActivity {
                     // Read from the InputStream.
                     numBytes = mmInStream.read(mmBuffer);
                     // Send the obtained bytes to the UI activity.
+                    readMessage=new String(mmBuffer, 0, numBytes);
                     Message readMsg = handler.obtainMessage(
                             0, numBytes, -1,
                             mmBuffer);
@@ -635,6 +654,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Access the batched historical event data points
     public void samples(MotionEvent ev) {
+        double curtotalpressure;
         final int historySize = ev.getHistorySize();
         final int pointerCount = ev.getPointerCount();
         System.out.printf("historySize:%d",historySize);
@@ -642,20 +662,15 @@ public class MainActivity extends AppCompatActivity {
         mVelocityTracker.addMovement(ev);
         for (int h = 0; h < historySize; h++) {
 //            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
-
+                curtotalpressure=0;
             for (int p = 0; p < pointerCount; p++) {
 //                System.out.printf("  pressure: (%f)|  ",
 //                        ev.getHistoricalPressure(p, h));
                 pressures.add((double) ev.getHistoricalPressure(p, h));
+                curtotalpressure+=(double) ev.getHistoricalPressure(p, h);
                 fingerSizes.add((double) ev.getHistoricalSize(p, h));
                 int curX=(int) ev.getHistoricalX(p, h);
                 int curY=(int) ev.getHistoricalY(p, h);
-                if(curX>500){
-                    System.out.println("right");
-                }
-                else{
-                    System.out.println("left");
-                }
                 if(timeStamp.size()>0){
                     //not the first point calculate velocity
                     double distance= calculateDistance(getLastElement(coordX),curX,getLastElement(coordY),curY);
@@ -671,16 +686,18 @@ public class MainActivity extends AppCompatActivity {
                 moveIndex++;
 
             }
+//            sendData(String.valueOf(curtotalpressure)+"\n");
         }
         System.out.printf("At time %d:", ev.getEventTime());
-
+        curtotalpressure=0;
         for (int p = 0; p < pointerCount; p++) {
 //            System.out.printf("  pressure: (%f)|  ", ev.getPressure(p));
             pressures.add((double) ev.getPressure(p));
+            curtotalpressure+=(double) ev.getPressure(p);
             fingerSizes.add((double) ev.getSize(p));
-            double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
-            double vel=distance/(ev.getEventTime()-getLastElement(timeStamp));
-            velocity.add(vel);
+//            double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
+//            double vel=distance/(ev.getEventTime()-getLastElement(timeStamp));
+//            velocity.add(vel);
             timeStamp.add(ev.getEventTime());
             coordX.add((int) ev.getX(p));
             coordY.add((int) ev.getY(p));
@@ -696,6 +713,7 @@ public class MainActivity extends AppCompatActivity {
 //            }
 
         }
+        sendData(String.valueOf(curtotalpressure)+"\n");
     }
 
     public static <E> E getLastElement(List<E> list)
