@@ -5,6 +5,9 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.view.WindowInsetsCompat;
 
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
@@ -28,18 +31,16 @@ import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
 import com.example.swipeauth.databinding.ActivityMainBinding;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -85,11 +86,31 @@ public class MainActivity extends AppCompatActivity {
 
     List<Long> timeStamp = new ArrayList<>();
     List<Double> pressures = new ArrayList<>();
+    //for 3 finger
+    List<Double> pressures1 = new ArrayList<>();
+    List<Double> pressures2 = new ArrayList<>();
+    List<Double> pressures3 = new ArrayList<>();
+    List<Double> fingerSizes1 = new ArrayList<>();
+    List<Double> fingerSizes2 = new ArrayList<>();
+    List<Double> fingerSizes3 = new ArrayList<>();
     List<Double> fingerSizes = new ArrayList<>();
     List<Integer> coordX = new ArrayList<>();
     List<Integer> coordY = new ArrayList<>();
 
     List<Double> velocity = new ArrayList<>();
+
+    Double fingerpressuremax1=0.0;
+    Double fingerpressuremax2=0.0;
+    Double fingerpressuremax3=0.0;
+    Double fingerpressurebase1=0.0;
+    Double fingerpressurebase2=0.0;
+    Double fingerpressurebase3=0.0;
+    boolean pressure3mode=false;
+    int debugbiint=0;
+    int lasttimestamp=0;
+    double lastpressure=0.0
+
+
 
     int dataCount = 0;
     int moveIndex = 0;
@@ -148,6 +169,13 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this,
                     new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 0);
         }
+        // acquire permission to vibrate
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.VIBRATE)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.VIBRATE}, 0);
+        }
         // Create and start the accept thread.
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
@@ -169,6 +197,21 @@ public class MainActivity extends AppCompatActivity {
                         // construct a string from the valid bytes in the buffer
                         readMessage = new String(readBuf, 0, msg.arg1);
                         text1.setText(readMessage);
+                        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(500, 128);
+                        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                        // Vibrate for 500 milliseconds
+                        v.vibrate(vibrationEffect);
+                        break;
+                    case 1:  // 对应ConnectedThread中MESSAGE_READ
+                        System.out.println("I am in case 1");
+//                        byte[] readBuf1 = (byte[]) msg.obj;
+//
+//                        // construct a string from the valid bytes in the buffer
+////                        readMessage = new String(readBuf1, 0, msg.arg1);
+//                        text1.setText(readMessage);
+                        authenticate();
+
+
                         break;
                     // ... 可以添加更多的case来处理其他类型的消息 ...
                 }
@@ -229,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
                 switch (motionEvent.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         if(dataCount == DATA_COUNT) {
-                            swipeText.setText("Finished collecting\nPlease export data");
+//                            swipeText.setText("Finished collecting\nPlease export data");
                             break;
                         }
 
@@ -246,11 +289,7 @@ public class MainActivity extends AppCompatActivity {
                         startX = (int) motionEvent.getX();
                         startY = (int) motionEvent.getY();
 
-//                        // Finger size
-//                        fingerSizes[moveIndex] = motionEvent.getSize();
-//
-//                        // Pressure
-//                        pressures[moveIndex] = motionEvent.getPressure();
+
 
                         // Velocity tracking
                         if(mVelocityTracker == null) {
@@ -266,20 +305,20 @@ public class MainActivity extends AppCompatActivity {
                         mVelocityTracker.addMovement(motionEvent);
 
                         // Count
-                        touchIndices[moveIndex] = touchIndex;
-                        moveIndex++;
-                        sendData("0.0\n");
+//                        touchIndices[moveIndex] = touchIndex;
+//                        moveIndex++;
+
 
                         break;
 
                     // Move
                     case MotionEvent.ACTION_MOVE:
                         if(dataCount == DATA_COUNT) {
-                            swipeText.setText("Finished collecting\nPlease export data");
+//                            swipeText.setText("Finished collecting\nPlease export data");
 //                            break;
                         }
                         else
-                            swipeText.setText("Swiping...");
+//                            swipeText.setText("Swiping...");
 
                         samples(motionEvent);
 
@@ -311,33 +350,43 @@ public class MainActivity extends AppCompatActivity {
                         break;
 
                     case MotionEvent.ACTION_UP:
+                        // Time
+                        end = System.currentTimeMillis();
+//                        text1.setText("please squeeze");
+                        swipeText.setText("please squeeze");
+                        debugbiint=0;
+
+                        durations[touchIndex] = (end - start);
+                        System.out.println("durations");
+                        System.out.println(durations[touchIndex]);
 
                         System.out.println(start);
 
 //                        System.out.println(velocity.size());
                         System.out.println(pressures.size());
-                        System.out.println(fingerSizes.size());
+                        System.out.println(coordX.size());
+                        System.out.println(coordX.size());
                         System.out.println(moveIndex);
                         System.out.println(touchIndex);
                         if(false) {
-                            swipeText.setText("Finished collecting\nPlease export data");
+//                            swipeText.setText("Finished collecting\nPlease export data");
 
                             break;
                         }
                         else {
                             dataCount++;
-                            swipeText.setText("Swipes: " + dataCount);
+//                            swipeText.setText("Swipes: " + dataCount);
                         }
 
                         // Action check
                         System.out.println("Up");
                         actions[moveIndex] = "UP";
+                        // Count
+//                        touchIndices[moveIndex] = touchIndex;
+//                        moveIndex++;
+                        touchIndex++;
 
-                        // Time
-                        end = System.currentTimeMillis();
 
-                        durations[touchIndex] = (end - start);
-                        System.out.println(durations[touchIndex]);
 
                         // Coords
                         endX = (int) motionEvent.getX();
@@ -385,22 +434,20 @@ public class MainActivity extends AppCompatActivity {
 //                        // Pressure
 //                        pressures[moveIndex] = motionEvent.getPressure();
 
-                        // Count
-                        touchIndices[moveIndex] = touchIndex;
-                        moveIndex++;
-                        touchIndex++;
-                        System.out.println("before loop");
-                        System.out.println(readMessage);
-                        readMessage="tmp";
-                        while(true){
-                            sendData("0.00\n");
-                            System.out.println(readMessage);
-                            if(readMessage!=null &&readMessage.equals("0.00")){
-                                break;
-                            }
 
-                        }
-                        readMessage="tmp";
+////                        used in  pressurebar
+//                        System.out.println("before loop");
+//                        System.out.println(readMessage);
+//                        readMessage="tmp";
+//                        while(true){
+//                            sendData("0.00\n");
+//                            System.out.println(readMessage);
+//                            if(readMessage!=null &&readMessage.equals("0.00")){
+//                                break;
+//                            }
+//
+//                        }
+//                        readMessage="tmp";
 
                         break;
 
@@ -547,10 +594,16 @@ public class MainActivity extends AppCompatActivity {
                     // Read from the InputStream.
                     numBytes = mmInStream.read(mmBuffer);
                     // Send the obtained bytes to the UI activity.
-                    readMessage=new String(mmBuffer, 0, numBytes);
-                    Message readMsg = handler.obtainMessage(
-                            0, numBytes, -1,
-                            mmBuffer);
+                    String receivedString=new String(mmBuffer, 0, numBytes);
+                    System.out.println(receivedString);
+                    int tag=-1;
+                    if (receivedString.equals("doauth")) {
+                        tag = 1;
+                    } else if(receivedString.equals("ready")) {
+                        tag = 0;  //“ready”
+                    }
+
+                    Message readMsg = handler.obtainMessage(tag, numBytes, -1, mmBuffer);
                     readMsg.sendToTarget();
                 } catch (IOException e) {
                     Log.d(TAG, "Input stream was disconnected", e);
@@ -565,7 +618,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // Share the sent message with the UI activity.
                 Message writtenMsg = handler.obtainMessage(
-                        1, -1, -1, mmBuffer);
+                        100, -1, -1, mmBuffer);
                 writtenMsg.sendToTarget();
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when sending data", e);
@@ -655,55 +708,68 @@ public class MainActivity extends AppCompatActivity {
     // Access the batched historical event data points
     public void samples(MotionEvent ev) {
         double curtotalpressure;
+        int curtotalX;
+        int curtotalY;
         final int historySize = ev.getHistorySize();
         final int pointerCount = ev.getPointerCount();
         System.out.printf("historySize:%d",historySize);
         System.out.printf("pointerCount:%d",pointerCount);
         mVelocityTracker.addMovement(ev);
-        for (int h = 0; h < historySize; h++) {
-//            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
-                curtotalpressure=0;
-            for (int p = 0; p < pointerCount; p++) {
-//                System.out.printf("  pressure: (%f)|  ",
-//                        ev.getHistoricalPressure(p, h));
-                pressures.add((double) ev.getHistoricalPressure(p, h));
-                curtotalpressure+=(double) ev.getHistoricalPressure(p, h);
-                fingerSizes.add((double) ev.getHistoricalSize(p, h));
-                int curX=(int) ev.getHistoricalX(p, h);
-                int curY=(int) ev.getHistoricalY(p, h);
-                if(timeStamp.size()>0){
-                    //not the first point calculate velocity
-                    double distance= calculateDistance(getLastElement(coordX),curX,getLastElement(coordY),curY);
-                    double vel=distance/(ev.getHistoricalEventTime(h)-getLastElement(timeStamp));
-                    velocity.add(vel);
-                }
-
-                timeStamp.add(ev.getHistoricalEventTime(h));
-                coordX.add(curX);
-                coordY.add(curY);
-                actions[moveIndex] = "Move";
-                touchIndices[moveIndex] = touchIndex;
-                moveIndex++;
-
-            }
-//            sendData(String.valueOf(curtotalpressure)+"\n");
-        }
+//        for (int h = 0; h < historySize; h++) {
+////            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
+//                curtotalpressure=0;
+//            for (int p = 0; p < pointerCount; p++) {
+////                System.out.printf("  pressure: (%f)|  ",
+////                        ev.getHistoricalPressure(p, h));
+//                pressures.add((double) ev.getHistoricalPressure(p, h));
+//                curtotalpressure+=(double) ev.getHistoricalPressure(p, h);
+//                fingerSizes.add((double) ev.getHistoricalSize(p, h));
+//                int curX=(int) ev.getHistoricalX(p, h);
+//                int curY=(int) ev.getHistoricalY(p, h);
+//                if(timeStamp.size()>0){
+//                    //not the first point calculate velocity
+//                    double distance= calculateDistance(getLastElement(coordX),curX,getLastElement(coordY),curY);
+//                    double vel=distance/(ev.getHistoricalEventTime(h)-getLastElement(timeStamp));
+//                    velocity.add(vel);
+//                }
+//
+//                timeStamp.add(ev.getHistoricalEventTime(h));
+//                coordX.add(curX);
+//                coordY.add(curY);
+//                actions[moveIndex] = "Move";
+//                touchIndices[moveIndex] = touchIndex;
+//                moveIndex++;
+//
+//            }
+////            sendData(String.valueOf(curtotalpressure)+"\n");
+//        }
         System.out.printf("At time %d:", ev.getEventTime());
         curtotalpressure=0;
+        curtotalX=0;
+        curtotalY=0;
+        if(pointerCount<3)
+            return;
+        int minY = 9999999;
+        int minYindex = -1;
+
         for (int p = 0; p < pointerCount; p++) {
+            if(minY>(int) ev.getY(p)){
+                minY=(int)ev.getY(p);
+                minYindex=p;
+            }
 //            System.out.printf("  pressure: (%f)|  ", ev.getPressure(p));
-            pressures.add((double) ev.getPressure(p));
+//            pressures.add((double) ev.getPressure(p));
             curtotalpressure+=(double) ev.getPressure(p);
-            fingerSizes.add((double) ev.getSize(p));
+            curtotalX+=(int) ev.getX(p);
+            curtotalY+=(int) ev.getY(p);
+//            fingerSizes.add((double) ev.getSize(p));
 //            double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
 //            double vel=distance/(ev.getEventTime()-getLastElement(timeStamp));
 //            velocity.add(vel);
             timeStamp.add(ev.getEventTime());
-            coordX.add((int) ev.getX(p));
-            coordY.add((int) ev.getY(p));
-            actions[moveIndex] = "Move";
-            touchIndices[moveIndex] = touchIndex;
-            moveIndex++;
+//            coordX.add((int) ev.getX(p));
+//            coordY.add((int) ev.getY(p));
+
 
 //            if((int) ev.getX(p)>500){
 //                System.out.println("right");
@@ -713,7 +779,71 @@ public class MainActivity extends AppCompatActivity {
 //            }
 
         }
-        sendData(String.valueOf(curtotalpressure)+"\n");
+        pressures.add(curtotalpressure);
+        coordX.add(curtotalX-3*(int) ev.getX(minYindex));
+        coordY.add(curtotalY-3*(int) ev.getY(minYindex));
+        List<Integer> listtmp = new ArrayList<>(Arrays.asList(0, 1, 2));
+        listtmp.remove(minYindex);  // remove smallest one and compare the rest two
+        System.out.println(listtmp.size());
+        if(!pressure3mode){
+            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+                pressures1.add((double) ev.getPressure(listtmp.get(0)));
+                pressures2.add((double) ev.getPressure(listtmp.get(1)));
+                fingerSizes1.add((double) ev.getSize(listtmp.get(0)));
+                fingerSizes2.add((double) ev.getSize(listtmp.get(1)));
+            }
+            else{
+                pressures1.add((double) ev.getPressure(listtmp.get(1)));
+                pressures2.add((double) ev.getPressure(listtmp.get(0)));
+                fingerSizes1.add((double) ev.getSize(listtmp.get(1)));
+                fingerSizes2.add((double) ev.getSize(listtmp.get(0)));
+
+            }
+            pressures3.add((double) ev.getPressure(minYindex));
+            fingerSizes3.add((double) ev.getSize(minYindex));
+
+        }
+        else{//output binary code
+            int bioutput=0;
+            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+                System.out.println("112121");
+
+                if((double) ev.getPressure(listtmp.get(0))>fingerpressuremax1*0.9){
+                    bioutput+=1;
+                }
+                if((double) ev.getPressure(listtmp.get(1))>fingerpressuremax2*0.9){
+                    bioutput+=2;
+                }
+            }
+            else{
+
+                if((double) ev.getPressure(listtmp.get(0))>fingerpressuremax2*0.9){
+                    bioutput+=2;
+                }
+                if((double) ev.getPressure(listtmp.get(1))>fingerpressuremax1*0.9){
+                    bioutput+=1;
+                }
+
+            }
+            if((double) ev.getPressure(minYindex)>(fingerpressuremax3*0.9)){
+                bioutput+=4;
+            }
+//            if( bioutput>debugbiint){
+//                debugbiint=bioutput;
+
+//                text1.setText(Integer.toString(bioutput));
+                swipeText.setText(Integer.toString(bioutput));
+//            }
+
+
+        }
+
+
+
+//        sendData(String.valueOf(curtotalpressure)+"\n"); //pressure bar function
+        actions[moveIndex] = "Move";
+        touchIndices[moveIndex] = touchIndex;
+        moveIndex++;
     }
 
     public static <E> E getLastElement(List<E> list)
@@ -744,37 +874,104 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void train(View view) {
-        String username = usernameEditText.getText().toString();
-        if (!Python.isStarted()){
-            Python.start(new AndroidPlatform(this));
-        }
-        Python python=Python.getInstance();
-        PyObject pyObject=python.getModule("authpy");
-        pyObject.callAttr("train",username);
+        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(500, 30);
+                        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        // Vibrate for 500 milliseconds
+        v.vibrate(vibrationEffect);
+
+
+//        String username = usernameEditText.getText().toString();
+//        if (!Python.isStarted()){
+//            Python.start(new AndroidPlatform(this));
+//        }
+//        Python python=Python.getInstance();
+//        PyObject pyObject=python.getModule("authpy");
+//        pyObject.callAttr("train",username);
+//        rest();
+
+
+        int count=0;
+        int i = touchIndices[count];
+        double totalbase1=0;
+        double totalbase2=0;
+        double totalbase3=0;
+        double totalmax1=0;
+        double totalmax2=0;
+        double totalmax3=0;
+        int stage1count=0;
+        int stage2count=0;
+        boolean stage1=true;// 第一个动作算轻放，第二个算最重压
+        while(true) {
+
+            int temp = touchIndices[count];
+            if (stage1) {
+                totalbase1+=pressures1.get(count);
+                totalbase2+=pressures2.get(count);
+                totalbase3+=pressures3.get(count);
+            }
+            else{
+                totalmax1+=pressures1.get(count);
+                totalmax2+=pressures2.get(count);
+                totalmax3+=pressures3.get(count);
+            }
+            count++;
+            if(count>=pressures.size())
+                break;
+            if(touchIndices[count] != temp){
+
+                i = touchIndices[count];
+                stage1=false;
+                stage1count=count;
+            }
+
+        };
+        stage2count=count-stage1count;
+        fingerpressurebase1= totalbase1/stage1count;
+        fingerpressurebase2= totalbase2/stage1count;
+        fingerpressurebase3= totalbase3/stage1count;
+        fingerpressuremax1= totalmax1/stage2count;
+        fingerpressuremax2= totalmax2/stage2count;
+        fingerpressuremax3= totalmax3/stage2count;
+        System.out.println(fingerpressurebase1);
+        System.out.println(fingerpressurebase1);
+        System.out.println(fingerpressurebase1);
+        System.out.println(fingerpressuremax1);
+        System.out.println(fingerpressuremax2);
+        System.out.println(fingerpressuremax3);
+
+        pressure3mode=true;
         rest();
 
 
-
-
     }
-    public void authenticate(View view) {
+    public void authenticate(){
+        System.out.println(pressures.size());
+        if(pressures.size()==0){
+            System.out.println("gogogo");
+            return;
+
+        }
+
         String username = usernameEditText.getText().toString();
         StringBuilder data = new StringBuilder();
         int count = 0;
         int i = touchIndices[count];
-        data.append(directions[i]).append(",");
+//        data.append(directions[i]).append(",");
         data.append(durations[i]).append(",");
-        do {
+        while(true) {
             int temp = touchIndices[count];
-
             data.append(pressures.get(count)).append(",").
-                    append(fingerSizes.get(count)).append(",");
+//                    append(coordX.get(count4press)).append(",").
+        append(coordY.get(count)).append(",");
             count++;
-            if (temp != touchIndices[count] && actions[count] != null) {
+            if(count>=pressures.size())
+                break;
+            if(touchIndices[count] != temp){
+
                 i = touchIndices[count];
-                data.append("\n").append(directions[i]).append(",").append(durations[i]).append(",");
+                data.append("\n").append(durations[i]).append(",");
             }
-        } while (actions[count] != null);
+        };
 
         try {
 //            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
@@ -803,8 +1000,14 @@ public class MainActivity extends AppCompatActivity {
         else{
             swipeText.setText("denied");
             sendData("denied\n");
+            rest();
 
         }
+
+    }
+    public void authenticate(View view) {
+        authenticate();
+
     }
     public void sendData(String data) {
         if (connectedThread != null) {
@@ -816,31 +1019,30 @@ public class MainActivity extends AppCompatActivity {
         connectedThread.start();
     }
     public void export(View view) {
+        System.out.println(Arrays.toString(touchIndices));
+        System.out.println(Arrays.toString(durations));
 
         String username = usernameEditText.getText().toString();
         StringBuilder data = new StringBuilder();
         int count = 0;
-        int count4press=0; //after modify, pressure and moveIndices has different index
         int i = touchIndices[count];
-        data.append(directions[i]).append(",");
+//        data.append(directions[i]).append(",");
         data.append(durations[i]).append(",");
-        count=1; // start from 1
 
         while(true) {
+
             int temp = touchIndices[count];
-            if(actions[count] == "UP"){
-                i = touchIndices[count];
-                data.append("\n").append(directions[i]).append(",").append(durations[i]).append(",");
-                count++;
-                if(actions[count]==null)
-                    break;
-                count++; //skip "DOWN" aciton
-                continue;
-            }
-            data.append(pressures.get(count4press)).append(",").
-                    append(fingerSizes.get(count4press)).append(",");
+            data.append(pressures.get(count)).append(",").
+//                    append(coordX.get(count4press)).append(",").
+            append(coordY.get(count)).append(",");
             count++;
-            count4press++;
+            if(count>=pressures.size())
+                break;
+            if(touchIndices[count] != temp){
+
+                i = touchIndices[count];
+                data.append("\n").append(durations[i]).append(",");
+            }
         };
 
         try {
