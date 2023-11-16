@@ -9,100 +9,30 @@
     tools:context=".MainActivity">
 
     <RelativeLayout
+        android:id="@+id/relativeLayout"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <TextView
-            android:id="@+id/up"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="50dp"
-            android:gravity="center|top"
-            android:text="to top" />
-
-        <TextView
-            android:id="@+id/topRight"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="50dp"
-            android:layout_marginRight="20dp"
-            android:gravity="right|top"
-            android:text="to top right" />
-
-        <TextView
-            android:id="@+id/right"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginRight="20dp"
-            android:gravity="right|center"
-            android:text="to right" />
-
-        <TextView
-            android:id="@+id/bottomRight"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginRight="20dp"
-            android:layout_marginBottom="50dp"
-            android:gravity="right|bottom"
-            android:text="to bottom right" />
-
-        <TextView
-            android:id="@+id/down"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginBottom="50dp"
-            android:gravity="bottom|center"
-            android:text="to bottom" />
-
-        <TextView
-            android:id="@+id/bottomLeft"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginLeft="20dp"
-            android:layout_marginBottom="50dp"
-            android:gravity="bottom|left"
-            android:text="to bottom left" />
-
-        <TextView
-            android:id="@+id/left"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginLeft="20dp"
-            android:gravity="center|left"
-            android:text="to left" />
-
-        <TextView
-            android:id="@+id/topLeft"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginLeft="20dp"
-            android:layout_marginTop="50dp"
-            android:gravity="left|top"
-            android:text="to top left" />
+        android:layout_height="match_parent"
+        tools:layout_editor_absoluteX="44dp"
+        tools:layout_editor_absoluteY="-16dp">
 
         <EditText
             android:id="@+id/useidtext"
             android:layout_width="212dp"
             android:layout_height="63dp"
-            android:layout_alignStart="@+id/bottomLeft"
-            android:layout_alignEnd="@+id/bottomRight"
-            android:layout_alignBottom="@+id/bottomRight"
-            android:layout_alignParentTop="true"
-            android:layout_marginStart="92dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="67dp"
-            android:layout_marginBottom="612dp"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentEnd="true"
+            android:layout_marginStart="101dp"
+            android:layout_marginEnd="96dp"
             android:ems="10"
             android:inputType="textPersonName"
             android:text="please input user id" />
-
     </RelativeLayout>
 
     <TextView
         android:id="@+id/swipe"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Please Start Swiping..."
+        android:text="Please Squeeze"
         android:textSize="60px"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
@@ -115,7 +45,7 @@
         android:layout_height="wrap_content"
         android:backgroundTint="@android:color/holo_blue_light"
         android:onClick="export"
-        android:text="Export Data"
+        android:text="current mode: register"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
@@ -124,8 +54,8 @@
         android:id="@+id/button2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:onClick="train"
-        android:text="train"
+        android:onClick="authenticate"
+        android:text="test"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/button"
         app:layout_constraintStart_toStartOf="parent" />
@@ -134,10 +64,34 @@
         android:id="@+id/button4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:onClick="authenticate"
-        android:text="test"
+        android:onClick="fresh"
+        android:text="fresh"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/button" />
+
+    <Switch
+        android:id="@+id/switch3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Normal"
+        app:layout_constraintEnd_toEndOf="@+id/button"
+        app:layout_constraintStart_toStartOf="@+id/button"
+        tools:layout_editor_absoluteY="656dp" />
+
+    <EditText
+        android:id="@+id/input"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:duplicateParentState="false"
+        android:ems="10"
+        android:inputType="textPersonName"
+        android:textAlignment="center"
+        android:textAppearance="@style/TextAppearance.AppCompat.Large"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/swipe"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/relativeLayout" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

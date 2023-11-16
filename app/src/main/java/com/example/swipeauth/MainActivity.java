@@ -2,28 +2,24 @@ package com.example.swipeauth;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.FileProvider;
-import androidx.core.view.WindowInsetsCompat;
 
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.Rect;
-import android.os.Build;
-import android.os.Environment;
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
-import android.view.ViewTreeObserver;
-import android.view.WindowInsets;
+import android.view.ViewConfiguration;
+import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import com.chaquo.python.PyObject;
@@ -31,31 +27,31 @@ import com.chaquo.python.Python;
 import com.chaquo.python.android.AndroidPlatform;
 
 import com.example.swipeauth.databinding.ActivityMainBinding;
+
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
-import android.content.pm.PackageManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
-import android.view.View;
-import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.InputStream;
+import java.util.Map;
 import java.util.UUID;
 
 
@@ -85,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
     Long[] durations = new Long[DATA_ENTRIES];
 
     List<Long> timeStamp = new ArrayList<>();
+    List<Long> timeStampEachTouch = new ArrayList<>(); // timeStamp but clear every action_up
     List<Double> pressures = new ArrayList<>();
     //for 3 finger
     List<Double> pressures1 = new ArrayList<>();
@@ -99,16 +96,23 @@ public class MainActivity extends AppCompatActivity {
 
     List<Double> velocity = new ArrayList<>();
 
+    //finger_distinguish
     Double fingerpressuremax1=0.0;
     Double fingerpressuremax2=0.0;
     Double fingerpressuremax3=0.0;
     Double fingerpressurebase1=0.0;
     Double fingerpressurebase2=0.0;
     Double fingerpressurebase3=0.0;
-    boolean pressure3mode=false;
+    boolean isnormal=true;  //only true apply squeeze binary input
     int debugbiint=0;
-    int lasttimestamp=0;
-    double lastpressure=0.0
+    int changetoregister=0; // this used to change to register mode later at action_up, but detection at action_move, so I first use it as signal
+
+    double lastpressure=0.0;
+    List<Integer> inputEachTouch= new ArrayList<>();
+    Map<Integer, Long> inputEachTouchmap = new HashMap<>();
+    int lastbioutput=-1;  //record last output number to calculate each number time
+    boolean is3finger=false; //variable to record if this action_move is 3 finger or not
+
 
 
 
@@ -126,42 +130,50 @@ public class MainActivity extends AppCompatActivity {
     int endX = 0;
     int endY = 0;
 
-    // Direction counts
-    int c1;
-    int c2;
-    int c3;
-    int c4;
-    int c5;
-    int c6;
-    int c7;
-    int c8;
 
     boolean isauthen=false;
     String readMessage;
 
 
-//    List<String> directionLable = new ArrayList<>();
 
     private TextView swipeText;
+    private Switch switchbutton;
+    private Button button;
 
-    // Labels for each direction
-    private TextView text1;
-    private TextView text2;
-    private TextView text3;
-    private TextView text4;
-    private TextView text5;
-    private TextView text6;
-    private TextView text7;
-    private TextView text8;
+
 
     private EditText usernameEditText;
+    private EditText inputEditText;
 
     private VelocityTracker mVelocityTracker = null;
+    private GestureDetector mGestureDetector;
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                // doubletap删除最后一个字符
+                System.out.println("Double tap detected with multiple pointers!");
+                String currentText = inputEditText.getText().toString();
+                if(currentText.length() > 0) {  // 检查是否为空字符串
+                    String newText = currentText.substring(0, currentText.length() - 1); // 删除最后一个字符
+                    inputEditText.setText(newText);
+                    sendData(newText);
+                }
+                return true;
+
+
+            }
+//            @Override
+//            public boolean onSingleTapConfirmed(MotionEvent e){
+////                inputEditText.setText("aaa");
+//                return true;
+//            }
+        });
+
         // acquire permission to save
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -196,10 +208,9 @@ public class MainActivity extends AppCompatActivity {
 
                         // construct a string from the valid bytes in the buffer
                         readMessage = new String(readBuf, 0, msg.arg1);
-                        text1.setText(readMessage);
-                        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(500, 128);
+                        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 10);
                         Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                        // Vibrate for 500 milliseconds
+                        // Vibrate for 2000 milliseconds
                         v.vibrate(vibrationEffect);
                         break;
                     case 1:  // 对应ConnectedThread中MESSAGE_READ
@@ -209,7 +220,7 @@ public class MainActivity extends AppCompatActivity {
 //                        // construct a string from the valid bytes in the buffer
 ////                        readMessage = new String(readBuf1, 0, msg.arg1);
 //                        text1.setText(readMessage);
-                        authenticate();
+//                        authenticate();
 
 
                         break;
@@ -225,7 +236,36 @@ public class MainActivity extends AppCompatActivity {
 
         View mContent = binding.main;
         swipeText = binding.swipe;
-        usernameEditText = findViewById(R.id.useidtext);
+        usernameEditText=binding.useidtext;
+        inputEditText=binding.input;
+//        inputEditText.setEnabled(false); //prevent user edit
+        inputEditText.setKeyListener(null);
+//        inputEditText.setText("123456");
+        switchbutton=binding.switch3;
+        button=binding.button;
+
+        button.setVisibility(View.INVISIBLE); // or View.GONE
+        switchbutton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    // Switch is in 'on' state, perform the necessary action
+                    Toast.makeText(MainActivity.this, "change to register mode", Toast.LENGTH_SHORT).show();
+                    switchbutton.setText("Register");
+                    swipeText.setText("Please squeeze twice\n lightly the first time then hard");
+                    isnormal=false;
+                    rest();
+
+
+                } else {
+                    // Switch is in 'off' state, perform the necessary action
+                    switchbutton.setText("Normal");
+                    isnormal=true;
+                    rest();
+                }
+            }
+        });
+//                usernameEditText = findViewById(R.id.useidtext);
 //exclude  edgeswipe back gesture
 //        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 //            mContent.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
@@ -251,33 +291,39 @@ public class MainActivity extends AppCompatActivity {
 //        PyObject pyObject=python.getModule("testoutput");
 //        pyObject.callAttr("sayHello");
 
-        text1 = binding.up;
-        text2 = binding.topRight;
-        text3 = binding.right;
-        text4 = binding.bottomRight;
-        text5 = binding.down;
-        text6 = binding.bottomLeft;
-        text7 = binding.left;
-        text8 = binding.topLeft;
+//
+        inputEachTouchmap.put(0, 0L);
+        inputEachTouchmap.put(1, 0L);
+        inputEachTouchmap.put(2, 0L);
+        inputEachTouchmap.put(3, 0L);
+        inputEachTouchmap.put(4, 0L);
+        inputEachTouchmap.put(5, 0L);
+        inputEachTouchmap.put(6, 0L);
+        inputEachTouchmap.put(7, 0L);
+
 
         mContent.setOnTouchListener(new View.OnTouchListener() {
-
             @SuppressLint("SetTextI18n")
             @Override
             public boolean onTouch(View view, MotionEvent motionEvent) {
+                // Let GestureDetector inspect all events.
+                mGestureDetector.onTouchEvent(motionEvent);
                 // Variables for velocity tracking
                 int index = motionEvent.getActionIndex();
                 int pointerId = motionEvent.getPointerId(index);
-
+                is2FingerDoubleClick(motionEvent);
                 switch (motionEvent.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        if(dataCount == DATA_COUNT) {
-//                            swipeText.setText("Finished collecting\nPlease export data");
-                            break;
-                        }
+
+                        is3finger=false;
+//                        dataCount++; // different with other count and index in action_up because it need to be reset to 0 during action_move
+//                        if(switchbutton.isChecked()&&dataCount == 2) {
+//                            swipeText.setText("Finished registration\nPlease input");
+//                            break;
+//                        }
 
                         // Action check
-                        view.performClick();
+//                        view.performClick();
                         System.out.println("Down");
                         actions[moveIndex] = "Down";
 
@@ -288,39 +334,34 @@ public class MainActivity extends AppCompatActivity {
                         // Coords
                         startX = (int) motionEvent.getX();
                         startY = (int) motionEvent.getY();
-
-
-
                         // Velocity tracking
-                        if(mVelocityTracker == null) {
-                            // Retrieve a new VelocityTracker object to watch the
-                            // velocity of a motion.
-                            mVelocityTracker = VelocityTracker.obtain();
-                        }
-                        else {
-                            // Reset the velocity tracker back to its initial state.
-                            mVelocityTracker.clear();
-                        }
-                        // Add a user's movement to the tracker.
-                        mVelocityTracker.addMovement(motionEvent);
+//                        if(mVelocityTracker == null) {
+//                            // Retrieve a new VelocityTracker object to watch the
+//                            // velocity of a motion.
+//                            mVelocityTracker = VelocityTracker.obtain();
+//                        }
+//                        else {
+//                            // Reset the velocity tracker back to its initial state.
+//                            mVelocityTracker.clear();
+//                        }
+//                        // Add a user's movement to the tracker.
+//                        mVelocityTracker.addMovement(motionEvent);
 
                         // Count
 //                        touchIndices[moveIndex] = touchIndex;
 //                        moveIndex++;
-
-
                         break;
 
                     // Move
                     case MotionEvent.ACTION_MOVE:
-                        if(dataCount == DATA_COUNT) {
-//                            swipeText.setText("Finished collecting\nPlease export data");
-//                            break;
-                        }
-                        else
-//                            swipeText.setText("Swiping...");
+//                        if(dataCount == DATA_COUNT) {
+////                            swipeText.setText("Finished collecting\nPlease export data");
+////                            break;
+//                        }
+//                        else
+////                            swipeText.setText("Swiping...");
 
-                        samples(motionEvent);
+                        samples(motionEvent);   //**important
 
                         // Action check
                         System.out.println("Move");
@@ -353,7 +394,7 @@ public class MainActivity extends AppCompatActivity {
                         // Time
                         end = System.currentTimeMillis();
 //                        text1.setText("please squeeze");
-                        swipeText.setText("please squeeze");
+//                        swipeText.setText("please squeeze");
                         debugbiint=0;
 
                         durations[touchIndex] = (end - start);
@@ -368,15 +409,7 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println(coordX.size());
                         System.out.println(moveIndex);
                         System.out.println(touchIndex);
-                        if(false) {
-//                            swipeText.setText("Finished collecting\nPlease export data");
 
-                            break;
-                        }
-                        else {
-                            dataCount++;
-//                            swipeText.setText("Swipes: " + dataCount);
-                        }
 
                         // Action check
                         System.out.println("Up");
@@ -385,15 +418,64 @@ public class MainActivity extends AppCompatActivity {
 //                        touchIndices[moveIndex] = touchIndex;
 //                        moveIndex++;
                         touchIndex++;
-
-
+                        dataCount++;
 
                         // Coords
                         endX = (int) motionEvent.getX();
                         endY = (int) motionEvent.getY();
+//                        System.out.println("datacount is here::::");
+//                        System.out.println(dataCount);
 
-                        Direction direction = getDirection(startX, startY, endX, endY);
-                        directions[touchIndex] = direction.toString();
+                        //** code of registration 3fingerBinaryPassword.**//
+
+                        if(switchbutton.isChecked()&&dataCount == 2) {
+                            swipeText.setText("Finished registration\nPlease input");
+                            train();
+                            switchbutton.setChecked(false);
+
+                            break;
+                        }
+                        else if(switchbutton.isChecked()&&dataCount == 1){
+                            swipeText.setText("Good,first squeeze complete!\nnow please squeeze hard");
+                        }
+                        else if(changetoregister==1){
+                            switchbutton.setChecked(true);//non exist user change to register mode automatically
+                            changetoregister=0;
+                        }
+                        else if(is3finger==true){ //normal 3finger input
+                            //type1.decide input number with mode
+//                        inputEditText.setText(inputEditText.getText()+Integer.toString(findMode(inputEachTouch)));
+//                        inputEachTouch.clear();
+                            //type2.decide input number with longest time  add a special rule only when 0 be pressed, 0 can be as output
+                            boolean isonly0=true;
+                            Map.Entry<Integer, Long> maxEntry = null;
+                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+                                if(entry.getKey()!=0&&entry.getValue()>0){
+                                    //if there is other number, then 0 willnot be output
+                                    isonly0=false;
+                                    inputEachTouchmap.put(0, 0L);
+                                    break;
+                                }
+                            }
+                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+
+                                if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
+                                    maxEntry = entry;
+                                }
+                            }
+                            sendData(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+                            inputEditText.setText(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+
+                            for (Integer key : inputEachTouchmap.keySet()) {//fresh dictionary
+                                inputEachTouchmap.put(key, 0L);
+                            }
+                            lastbioutput=-1;
+                            timeStampEachTouch.clear();
+                            swipeText.setText("Please squeeze");
+
+                        }
+//                        Direction direction = getDirection(startX, startY, endX, endY);
+
 
 //                        if (direction == Direction.down_up){
 //                            c1++;
@@ -448,18 +530,15 @@ public class MainActivity extends AppCompatActivity {
 //
 //                        }
 //                        readMessage="tmp";
-
                         break;
-
                     case MotionEvent.ACTION_CANCEL:
                         // Return a VelocityTracker object back to be re-used by others.
-                        mVelocityTracker.recycle();
-                        sendData("0.0\n");
+//                        mVelocityTracker.recycle();
+//                        sendData("0.0\n");
                         break;
                     default:
-                        sendData("0.0\n");
+//                        sendData("0.0\n");
                         break;
-
                 }
                 return true;
             }
@@ -479,7 +558,7 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MY_PERMISSIONS_REQUEST_BLUETOOTH_CONNECT) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                acceptThread = new AcceptThread(this);
+                acceptThread = new AcceptThread(this); //create a new bt thread
                 acceptThread.start();
             } else {
                 // Permission denied. Handle appropriately.
@@ -499,7 +578,7 @@ public class MainActivity extends AppCompatActivity {
         private Context context;
         private final BluetoothServerSocket mmServerSocket;
 
-        public AcceptThread(Context context) {
+        public AcceptThread(Context context) { //先接受连接再传读东西
             this.context = context;
             BluetoothServerSocket tmp = null;
             try {
@@ -534,7 +613,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (socket != null) {
-                    manageMyConnectedSocket(socket);
+                    manageMyConnectedSocket(socket); //start a connected thread
 //                    new ConnectedThread(socket).start();
 //                    Message msg = handler.obtainMessage(1, socket);
 //                    handler.sendMessage(msg);
@@ -571,6 +650,7 @@ public class MainActivity extends AppCompatActivity {
             // member streams are final.
             try {
                 tmpIn = socket.getInputStream();
+                tmpIn.available();
             } catch (IOException e) {
                 Log.e(TAG, "Error occurred when creating input stream", e);
             }
@@ -646,64 +726,64 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Calculate swipe angles
-    public Direction getDirection(float x1, float y1, float x2, float y2){
-        double rad = Math.atan2(y1-y2,x2-x1) + Math.PI;
-        double angle = (rad*180/Math.PI + 180)%360;
-        return Direction.fromAngle(angle);
-    }
-
-    public enum Direction{
-        up_down,
-        topRight_bottomLeft,
-        right_left,
-        bottomRight_topLeft,
-        down_up,
-        bottomLeft_topRight,
-        left_right,
-        topLeft_bottomRight;
-
-        public static Direction fromAngle(double angle){
-            if (inRange(angle, 75, 105)){
-                return Direction.down_up;
-            }
-            else if (inRange(angle, 15, 75)){
-                return Direction.bottomLeft_topRight;
-            }
-            else if (inRange(angle, 0, 15) || inRange(angle, 345, 360)){
-                return Direction.left_right;
-            }
-            else if (inRange(angle, 285, 345)){
-                return Direction.topLeft_bottomRight;
-            }
-            else if (inRange(angle, 255, 285)){
-                return Direction.up_down;
-            }
-            else if (inRange(angle, 195, 255)){
-                return Direction.topRight_bottomLeft;
-            }
-            else if (inRange(angle, 165, 195)){
-                return Direction.right_left;
-            }
-            else {
-                return  Direction.bottomRight_topLeft;
-            }
-        }
-
-        private static boolean inRange(double angle, float init, float end){
-            return (angle >= init) && (angle < end);
-        }
-    }
+//    // Calculate swipe angles
+//    public Direction getDirection(float x1, float y1, float x2, float y2){
+//        double rad = Math.atan2(y1-y2,x2-x1) + Math.PI;
+//        double angle = (rad*180/Math.PI + 180)%360;
+//        return Direction.fromAngle(angle);
+//    }
+//
+//    public enum Direction{
+//        up_down,
+//        topRight_bottomLeft,
+//        right_left,
+//        bottomRight_topLeft,
+//        down_up,
+//        bottomLeft_topRight,
+//        left_right,
+//        topLeft_bottomRight;
+//
+//        public static Direction fromAngle(double angle){
+//            if (inRange(angle, 75, 105)){
+//                return Direction.down_up;
+//            }
+//            else if (inRange(angle, 15, 75)){
+//                return Direction.bottomLeft_topRight;
+//            }
+//            else if (inRange(angle, 0, 15) || inRange(angle, 345, 360)){
+//                return Direction.left_right;
+//            }
+//            else if (inRange(angle, 285, 345)){
+//                return Direction.topLeft_bottomRight;
+//            }
+//            else if (inRange(angle, 255, 285)){
+//                return Direction.up_down;
+//            }
+//            else if (inRange(angle, 195, 255)){
+//                return Direction.topRight_bottomLeft;
+//            }
+//            else if (inRange(angle, 165, 195)){
+//                return Direction.right_left;
+//            }
+//            else {
+//                return  Direction.bottomRight_topLeft;
+//            }
+//        }
+//
+//        private static boolean inRange(double angle, float init, float end){
+//            return (angle >= init) && (angle < end);
+//        }
+//    }
 
     // Check if all directions have enough number of swipes collected
-    public boolean validation (int c1, int c2, int c3, int c4, int c5, int c6, int c7, int c8){
-        int[] array = new int[]{c1, c2, c3, c4, c5, c6 ,c7, c8};
-        boolean v = false;
-        for (int j : array) {
-            v = j >= 10;
-        }
-        return v;
-    }
+//    public boolean validation (int c1, int c2, int c3, int c4, int c5, int c6, int c7, int c8){
+//        int[] array = new int[]{c1, c2, c3, c4, c5, c6 ,c7, c8};
+//        boolean v = false;
+//        for (int j : array) {
+//            v = j >= 10;
+//        }
+//        return v;
+//    }
 
     // Access the batched historical event data points
     public void samples(MotionEvent ev) {
@@ -714,7 +794,7 @@ public class MainActivity extends AppCompatActivity {
         final int pointerCount = ev.getPointerCount();
         System.out.printf("historySize:%d",historySize);
         System.out.printf("pointerCount:%d",pointerCount);
-        mVelocityTracker.addMovement(ev);
+//        mVelocityTracker.addMovement(ev);
 //        for (int h = 0; h < historySize; h++) {
 ////            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
 //                curtotalpressure=0;
@@ -749,6 +829,7 @@ public class MainActivity extends AppCompatActivity {
         curtotalY=0;
         if(pointerCount<3)
             return;
+        is3finger=true;
         int minY = 9999999;
         int minYindex = -1;
 
@@ -766,7 +847,7 @@ public class MainActivity extends AppCompatActivity {
 //            double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
 //            double vel=distance/(ev.getEventTime()-getLastElement(timeStamp));
 //            velocity.add(vel);
-            timeStamp.add(ev.getEventTime());
+
 //            coordX.add((int) ev.getX(p));
 //            coordY.add((int) ev.getY(p));
 
@@ -779,13 +860,16 @@ public class MainActivity extends AppCompatActivity {
 //            }
 
         }
+        timeStamp.add(ev.getEventTime());
+        timeStampEachTouch.add(ev.getEventTime());
         pressures.add(curtotalpressure);
         coordX.add(curtotalX-3*(int) ev.getX(minYindex));
         coordY.add(curtotalY-3*(int) ev.getY(minYindex));
         List<Integer> listtmp = new ArrayList<>(Arrays.asList(0, 1, 2));
+        System.out.println(listtmp+","+minYindex);
         listtmp.remove(minYindex);  // remove smallest one and compare the rest two
-        System.out.println(listtmp.size());
-        if(!pressure3mode){
+
+        if(!isnormal){   //不是输入所以是register
             if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
                 pressures1.add((double) ev.getPressure(listtmp.get(0)));
                 pressures2.add((double) ev.getPressure(listtmp.get(1)));
@@ -804,35 +888,56 @@ public class MainActivity extends AppCompatActivity {
 
         }
         else{//output binary code
-            int bioutput=0;
-            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
-                System.out.println("112121");
-
-                if((double) ev.getPressure(listtmp.get(0))>fingerpressuremax1*0.9){
-                    bioutput+=1;
-                }
-                if((double) ev.getPressure(listtmp.get(1))>fingerpressuremax2*0.9){
-                    bioutput+=2;
-                }
+            if(!
+                    readCsvFile(getFilesDir()+"/"+usernameEditText.getText().toString()+"pressmaxbase.csv")){
+                //user not exist
+                changetoregister=1;
+                swipeText.setText("This user doesn't exist, register first");
+//                switchbutton.setChecked(true);
             }
-            else{
+            else{  // open user csv successfully
+                int bioutput=0;
+                if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+                    System.out.println("112121");
 
-                if((double) ev.getPressure(listtmp.get(0))>fingerpressuremax2*0.9){
-                    bioutput+=2;
+
+                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax1+fingerpressurebase1)/2){
+                        bioutput+=1;
+                    }
+                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax2+fingerpressurebase2)/2){
+                        bioutput+=2;
+                    }
                 }
-                if((double) ev.getPressure(listtmp.get(1))>fingerpressuremax1*0.9){
-                    bioutput+=1;
+                else{
+
+                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax2+fingerpressurebase2)/2){
+                        bioutput+=2;
+                    }
+                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax1+fingerpressurebase1)/2){
+                        bioutput+=1;
+                    }
+
                 }
+                if((double) ev.getPressure(minYindex)>((fingerpressuremax3+fingerpressurebase3)/2)){
+                    bioutput+=4;
+                }
+                swipeText.setText(Integer.toString(bioutput));
+
+                sendData(inputEditText.getText()+"<color=#ff0000>"+Integer.toString(bioutput)+"</color>");
+                if(timeStampEachTouch.size()>1){
+                    inputEachTouchmap.put(lastbioutput,inputEachTouchmap.get(lastbioutput)+timeStampEachTouch.get(timeStampEachTouch.size()-1)-timeStampEachTouch.get(timeStampEachTouch.size()-2)); //current-last(倒数第一减倒数第二)
+                }
+                lastbioutput=bioutput;
+//                inputEachTouch.add(bioutput);
+
 
             }
-            if((double) ev.getPressure(minYindex)>(fingerpressuremax3*0.9)){
-                bioutput+=4;
-            }
+
 //            if( bioutput>debugbiint){
 //                debugbiint=bioutput;
 
 //                text1.setText(Integer.toString(bioutput));
-                swipeText.setText(Integer.toString(bioutput));
+
 //            }
 
 
@@ -855,9 +960,20 @@ public class MainActivity extends AppCompatActivity {
     public double calculateDistance(int x1, int y1, int x2, int y2) {
         return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
     }
+
+    public  void send100(View view){  //test use only
+        int n;
+        for(n=0;n<100;n++){
+            sendData(Integer.toString(n));
+        }
+    }
+
     public void rest(){
+        System.out.println("datacount in rest::::");
+
         // reset
         dataCount = 0;
+        System.out.println(dataCount);
         moveIndex = 0;
         touchIndex = 0;
         actions = new String[DATA_ENTRIES];
@@ -866,19 +982,39 @@ public class MainActivity extends AppCompatActivity {
         durations = new Long[DATA_ENTRIES];
 
         timeStamp.clear();
+        timeStampEachTouch.clear();
         pressures.clear();
         fingerSizes.clear();
         coordX.clear();
         coordY.clear();
+        pressures1.clear();
+        pressures3.clear();
+        pressures2.clear();
+        for (Integer key : inputEachTouchmap.keySet()) {
+            inputEachTouchmap.put(key, 0L);
+        }
+
+    }
+    public void fresh(View view){
+        inputEditText.setText("");
+        swipeText.setText("Please squeeze");
+        rest();
+    }
+    public void test(View view){
+        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 10);
+        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        // Vibrate for 500 milliseconds
+        v.vibrate(vibrationEffect);
     }
 
-
-    public void train(View view) {
-        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(500, 30);
+    public void train(View view){
+        train();
+    }
+    public void train() { //acquire max and min limit and threshold
+        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 30);
                         Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         // Vibrate for 500 milliseconds
         v.vibrate(vibrationEffect);
-
 
 //        String username = usernameEditText.getText().toString();
 //        if (!Python.isStarted()){
@@ -888,7 +1024,6 @@ public class MainActivity extends AppCompatActivity {
 //        PyObject pyObject=python.getModule("authpy");
 //        pyObject.callAttr("train",username);
 //        rest();
-
 
         int count=0;
         int i = touchIndices[count];
@@ -900,47 +1035,95 @@ public class MainActivity extends AppCompatActivity {
         double totalmax3=0;
         int stage1count=0;
         int stage2count=0;
+//        double [] arrbase1=new double[100];
+//        double [] arrbase2=new double[100];
+//        double [] arrbase3=new double[100];
+//        double [] arrmax1=new double[100];
+//        double [] arrmax2=new double[100];
+//        double [] arrmax3=new double[100];
+        List<Double> listbase1 = new ArrayList<>();
+        List<Double> listbase2 = new ArrayList<>();
+        List<Double> listbase3 = new ArrayList<>();
+        List<Double> listmax1 = new ArrayList<>();
+        List<Double> listmax2 = new ArrayList<>();
+        List<Double> listmax3 = new ArrayList<>();
+
         boolean stage1=true;// 第一个动作算轻放，第二个算最重压
         while(true) {
-
             int temp = touchIndices[count];
             if (stage1) {
                 totalbase1+=pressures1.get(count);
                 totalbase2+=pressures2.get(count);
                 totalbase3+=pressures3.get(count);
+                listbase1.add(pressures1.get(count));
+                listbase2.add(pressures2.get(count));
+                listbase3.add(pressures3.get(count));
             }
             else{
                 totalmax1+=pressures1.get(count);
                 totalmax2+=pressures2.get(count);
                 totalmax3+=pressures3.get(count);
+                listmax1.add(pressures1.get(count));
+                listmax2.add(pressures2.get(count));
+                listmax3.add(pressures3.get(count));
             }
             count++;
             if(count>=pressures.size())
                 break;
             if(touchIndices[count] != temp){
-
                 i = touchIndices[count];
                 stage1=false;
                 stage1count=count;
             }
-
         };
+//        double fingerpressurebase11;
+//        double fingerpressurebase21;
+//        double fingerpressurebase31;
+//        double fingerpressuremax11;
+//        double fingerpressuremax21;
+//        double fingerpressuremax31;
         stage2count=count-stage1count;
-        fingerpressurebase1= totalbase1/stage1count;
-        fingerpressurebase2= totalbase2/stage1count;
-        fingerpressurebase3= totalbase3/stage1count;
-        fingerpressuremax1= totalmax1/stage2count;
-        fingerpressuremax2= totalmax2/stage2count;
-        fingerpressuremax3= totalmax3/stage2count;
-        System.out.println(fingerpressurebase1);
-        System.out.println(fingerpressurebase1);
-        System.out.println(fingerpressurebase1);
-        System.out.println(fingerpressuremax1);
-        System.out.println(fingerpressuremax2);
-        System.out.println(fingerpressuremax3);
+//        fingerpressurebase1= totalbase1/stage1count;
+//        fingerpressurebase2= totalbase2/stage1count;
+//        fingerpressurebase3= totalbase3/stage1count;
+//        fingerpressuremax1= totalmax1/stage2count;
+//        fingerpressuremax2= totalmax2/stage2count;
+//        fingerpressuremax3= totalmax3/stage2count;
+        fingerpressurebase1= findMedian(listbase1);
+        fingerpressurebase2= findMedian(listbase2);
+        fingerpressurebase3= findMedian(listbase3);
+        fingerpressuremax1= findMedian(listmax1);
+        fingerpressuremax2= findMedian(listmax2);
+        fingerpressuremax3= findMedian(listmax3);
 
-        pressure3mode=true;
+
+//
+//        System.out.println(fingerpressurebase1+","+fingerpressurebase11);
+//        System.out.println(fingerpressurebase2+","+fingerpressurebase21);
+//        System.out.println(fingerpressurebase3+","+fingerpressurebase31);
+//        System.out.println(fingerpressuremax1+","+fingerpressuremax11);
+//        System.out.println(fingerpressuremax2+","+fingerpressuremax21);
+//        System.out.println(fingerpressuremax3+","+fingerpressuremax31);
+
         rest();
+
+        String username = usernameEditText.getText().toString();
+        StringBuilder data = new StringBuilder();
+        data.append(fingerpressurebase1).append(",").append( fingerpressuremax1).append("\n");
+        data.append(fingerpressurebase2).append(",").append( fingerpressuremax2).append("\n");
+        data.append(fingerpressurebase3).append(",").append( fingerpressuremax3).append("\n");
+
+        try {
+
+//            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+            File file = new File(getFilesDir(), username+"pressmaxbase.csv");
+            FileOutputStream out = new FileOutputStream(file);
+            out.write(data.toString().getBytes());
+            out.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
 
     }
@@ -1010,8 +1193,9 @@ public class MainActivity extends AppCompatActivity {
 
     }
     public void sendData(String data) {
+        String data1=data+"\n";
         if (connectedThread != null) {
-            connectedThread.write(data.getBytes());
+            connectedThread.write(data1.getBytes());
         }
     }
     private void manageMyConnectedSocket(BluetoothSocket socket) {
@@ -1057,4 +1241,94 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
+    public boolean readCsvFile(String path) {
+        String csvLine;
+        File file = new File(path);
+        System.out.println(path);
+        // If the file does not exist, return false
+        if (!file.exists()) {
+            return false;
+        }
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(path));
+            String[] maxarrr=new String[3];
+            String[] basearrr=new String[3];
+            int n=0;
+            while ((csvLine = br.readLine()) != null) {
+                String[] dataarr = csvLine.split(",");
+                // 'data' array contains your csv data.
+                maxarrr[n]=dataarr[1];
+                basearrr[n]=dataarr[0];
+                n++;
+            }
+            fingerpressuremax1=Double.valueOf(maxarrr[0]);
+            fingerpressuremax2=Double.valueOf(maxarrr[1]);
+            fingerpressuremax3=Double.valueOf(maxarrr[2]);
+            fingerpressurebase1=Double.valueOf(basearrr[0]);
+            fingerpressurebase2=Double.valueOf(basearrr[1]);
+            fingerpressurebase3=Double.valueOf(basearrr[2]);
+        } catch (IOException ex) {
+            throw new RuntimeException("Error reading CSV file: " + ex);
+        }
+
+        return true;
+    }
+    public double findMedian(List<Double> nums) {
+        Collections.sort(nums);
+        int n = nums.size();
+        return (n % 2 != 0) ? nums.get(n / 2) : (nums.get((n - 1) / 2) + nums.get(n / 2)) / 2.0;
+    }
+    private static final int TIMEOUT = ViewConfiguration.getDoubleTapTimeout() + 100;
+    private long mFirstDownTime = 0;
+    private boolean mSeparateTouches = false;
+    private byte mTwoFingerTapCount = 0;
+    private void is2FingerDoubleClick(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                if (mFirstDownTime == 0 || event.getEventTime() - mFirstDownTime > TIMEOUT)
+                    twofingerreset(event.getDownTime());
+                break;
+            case MotionEvent.ACTION_POINTER_UP:
+                if (event.getPointerCount() == 2)
+                    mTwoFingerTapCount++;
+                else
+                    mFirstDownTime = 0;
+                break;
+            case MotionEvent.ACTION_UP:
+                if (!mSeparateTouches)
+                    mSeparateTouches = true;
+                else if (mTwoFingerTapCount == 2 && event.getEventTime() - mFirstDownTime < TIMEOUT) {
+                    mFirstDownTime = 0;
+                    Toast.makeText(MainActivity.this, "双指双击事件", Toast.LENGTH_SHORT).show();
+                }
+        }
+    }
+
+    private void twofingerreset(long time) {
+        mFirstDownTime = time;
+        mSeparateTouches = false;
+        mTwoFingerTapCount = 0;
+    }
+//    public static int findMode(List<Integer> list) {
+//        Map<Integer, Integer> countMap = new HashMap<>();
+//        // 计算每个元素出现的次数
+//        for (Integer num : list) {
+//            countMap.put(num, countMap.getOrDefault(num, 0) + 1);
+//        }
+//
+//        List<Integer> modes = new ArrayList<>();
+//        int maxCount = 0;
+//        // 遍历map，找出出现次数最多的元素
+//        for (Map.Entry<Integer, Integer> entry : countMap.entrySet()) {
+//            int count = entry.getValue();
+//            if (count > maxCount) {
+//                modes.clear();
+//                modes.add(entry.getKey());
+//                maxCount = count;
+//            } else if (count == maxCount) {
+//                modes.add(entry.getKey());
+//            }
+//        }
+//        return modes.get(0);
+//    }
 }
