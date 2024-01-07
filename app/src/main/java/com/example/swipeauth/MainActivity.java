@@ -16,9 +16,11 @@ import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -83,6 +85,12 @@ public class MainActivity extends AppCompatActivity {
     List<Long> timeStamp = new ArrayList<>();
     List<Long> timeStampEachTouch = new ArrayList<>(); // timeStamp but clear every action_up
     List<Double> pressures = new ArrayList<>();
+    //for multilevelpress it used to save max and min pressure for different user and decide each level
+    List<Double> pressurestotal = new ArrayList<>();
+
+    //for multilevelpress
+    Double multilebvelpressmax=0.0;
+    Double multilebvelpressmin=0.0;
     //for 3 finger
     List<Double> pressures1 = new ArrayList<>();
     List<Double> pressures2 = new ArrayList<>();
@@ -112,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
     Map<Integer, Long> inputEachTouchmap = new HashMap<>();
     int lastbioutput=-1;  //record last output number to calculate each number time
     boolean is3finger=false; //variable to record if this action_move is 3 finger or not
+    int lastpointercount=0; // record if some finger up
 
 
 
@@ -119,6 +128,7 @@ public class MainActivity extends AppCompatActivity {
     int dataCount = 0;
     int moveIndex = 0;
     int touchIndex = 0;
+    int curviblevel=0;
 
     // Times
     long start;
@@ -139,6 +149,11 @@ public class MainActivity extends AppCompatActivity {
     private TextView swipeText;
     private Switch switchbutton;
     private Button button;
+    private Spinner levelspinner;
+    private Spinner vibpatternspinner;
+    private int curlevelselected=0;
+    private int curvibpattern=0;
+
 
 
 
@@ -147,6 +162,8 @@ public class MainActivity extends AppCompatActivity {
 
     private VelocityTracker mVelocityTracker = null;
     private GestureDetector mGestureDetector;
+
+    private Vibrator v;
 
     @SuppressLint("ClickableViewAccessibility")
     @Override
@@ -243,6 +260,8 @@ public class MainActivity extends AppCompatActivity {
 //        inputEditText.setText("123456");
         switchbutton=binding.switch3;
         button=binding.button;
+        levelspinner=binding.spinner;
+        vibpatternspinner=binding.spinnervibpattern;
 
         button.setVisibility(View.INVISIBLE); // or View.GONE
         switchbutton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -250,9 +269,9 @@ public class MainActivity extends AppCompatActivity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
                     // Switch is in 'on' state, perform the necessary action
-                    Toast.makeText(MainActivity.this, "change to register mode", Toast.LENGTH_SHORT).show();
-                    switchbutton.setText("Register");
-                    swipeText.setText("Please squeeze twice\n lightly the first time then hard");
+//                    Toast.makeText(MainActivity.this, "change to register mode", Toast.LENGTH_SHORT).show();
+                    switchbutton.setText("register");
+                    swipeText.setText("Please press twice\n lightly the first time then hard");
                     isnormal=false;
                     rest();
 
@@ -265,6 +284,56 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        levelspinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                // 选项选择逻辑处理
+                switch (position) {
+                    case 0:
+                        // "开" 被选中
+                        curlevelselected=5;
+                        break;
+                    case 1:
+                        // "关" 被选中
+                        curlevelselected=6;
+                        break;
+                    case 2:
+                        // "自动" 被选中
+                        curlevelselected=7;
+                        break;
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // 没有选项被选中
+                curlevelselected=5;
+            }
+        });
+        vibpatternspinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                // 选项选择逻辑处理
+                switch (position) {
+                    case 0:
+                        // binary
+                        curvibpattern=0;
+                        break;
+                    case 1:
+                        // 2-bit
+                        curvibpattern=1;
+                        break;
+
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                // 没有选项被选中
+                curvibpattern=0;
+            }
+        });
+
 //                usernameEditText = findViewById(R.id.useidtext);
 //exclude  edgeswipe back gesture
 //        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -302,6 +371,8 @@ public class MainActivity extends AppCompatActivity {
         inputEachTouchmap.put(7, 0L);
 
 
+
+
         mContent.setOnTouchListener(new View.OnTouchListener() {
             @SuppressLint("SetTextI18n")
             @Override
@@ -312,8 +383,81 @@ public class MainActivity extends AppCompatActivity {
                 int index = motionEvent.getActionIndex();
                 int pointerId = motionEvent.getPointerId(index);
                 is2FingerDoubleClick(motionEvent);
+//                VibrationEffect vibrationEffect = VibrationEffect.createOneShot(10000, 5);
+                VibrationEffect vibrationEffect1 = VibrationEffect.createOneShot(10000, 10);
+                VibrationEffect vibrationEffect2 = VibrationEffect.createOneShot(10000, 20);
+                VibrationEffect vibrationEffect3 = VibrationEffect.createOneShot(10000, 30);
+                VibrationEffect vibrationEffect4 = VibrationEffect.createOneShot(10000, 40);
+                VibrationEffect vibrationEffect5 = VibrationEffect.createOneShot(10000, 50);
+                VibrationEffect vibrationEffectchange = VibrationEffect.createOneShot(200, 255);
+                VibrationEffect vibrationEffect1a = VibrationEffect.createOneShot(100, 15);
+                VibrationEffect vibrationEffect2a = VibrationEffect.createOneShot(100, 30);
+                VibrationEffect vibrationEffect3a = VibrationEffect.createOneShot(100, 50);
+                VibrationEffect vibrationEffect4a = VibrationEffect.createOneShot(100, 80);
+                VibrationEffect vibrationEffect5a = VibrationEffect.createOneShot(100, 100);
+
+                VibrationEffect vibrationEffectcontest1 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,10,0,10,0,10,0},0);
+                VibrationEffect vibrationEffectcontest2 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,10,0,10,0,20,0},0);
+                VibrationEffect vibrationEffectcontest3 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,10,0,20,0,10,0},0);
+                VibrationEffect vibrationEffectcontest4 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,10,0,20,0,20,0},0);
+                VibrationEffect vibrationEffectcontest5 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,20,0,10,0,20,0},0);
+                VibrationEffect vibrationEffectcontest6 = VibrationEffect.createWaveform(new long[] {0,100L,100L,100L,100L,100L,800L},new int[]{0,20,0,10,0,20,0},0);
+//length
+                VibrationEffect vibrationEffectbinary1 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,10,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary2 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,200L,500L},new int[]{0,20,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary3 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,200L,100L,50L,500L},new int[]{0,30,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary4 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,200L,100L,200L,500L},new int[]{0,40,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary5 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,50L,100L,50L,500L},new int[]{0,50,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary6 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,50L,100L,200L,500L},new int[]{0,60,0,15,0,15,0,15,0},2);
+                VibrationEffect vibrationEffectbinary7 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,200L,100L,50L,500L},new int[]{0,70,0,15,0,15,0,15,0},2);
+//amplitude
+//                VibrationEffect vibrationEffectbinary1 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,10,0,10,0,10,0,10,0},2);
+//                VibrationEffect vibrationEffectbinary2 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,20,0,10,0,10,0,30,0},2);
+//                VibrationEffect vibrationEffectbinary3 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,30,0,10,0,30,0,10,0},2);
+//                VibrationEffect vibrationEffectbinary4 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,40,0,10,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectbinary5 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,50,0,30,0,10,0,10,0},2);
+//                VibrationEffect vibrationEffectbinary6 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,60,0,30,0,10,0,30,0},2);
+//                VibrationEffect vibrationEffectbinary7 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,50L,500L},new int[]{0,70,0,30,0,30,0,10,0},2);
+
+//                VibrationEffect vibrationEffectcontest11 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L,100L,200L,500L},new int[]{0,20,0,20,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectcontest22 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,200L,100L,50L,500L},new int[]{0,30,0,30,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectcontest33 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,200L,100L,200L,500L},new int[]{0,30,0,30,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectcontest44 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,50L,100L,50L,500L},new int[]{0,30,0,30,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectcontest55 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,50L,100L,200L,500L},new int[]{0,30,0,30,0,30,0,30,0},2);
+//                VibrationEffect vibrationEffectcontest66 = VibrationEffect.createWaveform(new long[] {0,100L,500L,200L,100L,200L,100L,200L,500L},new int[]{0,30,0,30,0,30,0,30,0},2);
+
+//                VibrationEffect vibrationEffectcon2bit1 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,10,0,10,0,10},2);
+//                VibrationEffect vibrationEffectcon2bit2 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,15,0,10,0,20},2);
+//                VibrationEffect vibrationEffectcon2bit3 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,20,0,20,0,10},2);
+//                VibrationEffect vibrationEffectcon2bit4 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,25,0,20,0,20},2);
+//                VibrationEffect vibrationEffectcon2bit5 = VibrationEffect.createWaveform(new long[] {0,100L,350L,200L,100L,50L},new int[]{0,30,0,10,0,10},2);
+//                VibrationEffect vibrationEffectcon2bit6 = VibrationEffect.createWaveform(new long[] {0,100L,350L,200L,100L,50L},new int[]{0,35,0,10,0,20},2);
+
+                VibrationEffect vibrationEffectcon2bit1 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,10,0,10,0,10},2);
+                VibrationEffect vibrationEffectcon2bit2 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,15,0,10,0,20},2);
+                VibrationEffect vibrationEffectcon2bit3 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,20,0,20,0,10},2);
+                VibrationEffect vibrationEffectcon2bit4 = VibrationEffect.createWaveform(new long[] {0,100L,500L,50L,100L,50L},new int[]{0,25,0,20,0,20},2);
+                VibrationEffect vibrationEffectcon2bit5 = VibrationEffect.createWaveform(new long[] {0,100L,350L,200L,100L,50L},new int[]{0,30,0,10,0,10},2);
+                VibrationEffect vibrationEffectcon2bit6 = VibrationEffect.createWaveform(new long[] {0,100L,350L,200L,100L,50L},new int[]{0,35,0,10,0,20},2);
+                VibrationEffect vibrationEffectcon2bit7 = VibrationEffect.createWaveform(new long[] {0,100L,350L,200L,100L,50L},new int[]{0,40,0,20,0,10},2);
+                double presslevelinterval=(multilebvelpressmax-multilebvelpressmin)/curlevelselected;
                 switch (motionEvent.getAction()) {
                     case MotionEvent.ACTION_DOWN:
+                        //read multilevelmaxmin
+                        if(!readCsvFile(getFilesDir()+"/"+usernameEditText.getText().toString()+"multilevelmaxmin.csv")){
+                            //user not exist
+                            changetoregister=1; //make change to reg mode latter in action_up
+                            swipeText.setText("This user doesn't exist, register first");
+                        }
+                        else{  // open user csv successfully
+                            changetoregister=0;
+                            System.out.println("multilebvelpressmax"+multilebvelpressmax);
+                            System.out.println("multilebvelpressmin"+multilebvelpressmin);
+                        }
+
+
+                        v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//                        v.vibrate(vibrationEffect);
 
                         is3finger=false;
 //                        dataCount++; // different with other count and index in action_up because it need to be reset to 0 during action_move
@@ -354,18 +498,157 @@ public class MainActivity extends AppCompatActivity {
 
                     // Move
                     case MotionEvent.ACTION_MOVE:
+//                        v.vibrate(vibrationEffect);
 //                        if(dataCount == DATA_COUNT) {
 ////                            swipeText.setText("Finished collecting\nPlease export data");
 ////                            break;
 //                        }
 //                        else
 ////                            swipeText.setText("Swiping...");
+                        int pointerCount=motionEvent.getPointerCount();
+//                        if(pointerCount<5){
+//                            v.cancel();
+//                            break;
+//                        }
+                        double curtotalpressure=0;
+                        for (int p = 0; p < pointerCount; p++) {
+                            curtotalpressure+=(double) motionEvent.getPressure(p);
+                        }
+
+                        System.out.println("xxxxxxxxxx"+curtotalpressure);
+
+                        System.out.println("xxxxxxxxxxlevel"+curviblevel);
+//                            if(curtotalpressure<0.8&&curviblevel!=1){
+//                                v.cancel();
+//                                v.vibrate(vibrationEffectchange);
+//                                v.vibrate(vibrationEffect1);
+//                                curviblevel=1;
+//                            }
+//                        if(pointerCount<lastpointercount){ // prevent fingerup vib wrongly
+//                            curviblevel=0;
+//                            lastpointercount=pointerCount;
+//                            break;
+//                        }
+                        if (switchbutton.isChecked()){ //registration模式
+                            pressurestotal.add(curtotalpressure);
+//                                if (curtotalpressure<0.8&&curviblevel!=1) {
+//                                    v.cancel();
+////                                v.vibrate(vibrationEffectchange);
+//
+//                                    curviblevel=1;
+//                                }
+//                                else if (curtotalpressure<1.4&&curtotalpressure>=0.8&&curviblevel!=2) {
+//                                    v.cancel();
+//                                    v.vibrate(vibrationEffectchange);
+//                                    v.vibrate(vibrationEffect1);
+//                                    curviblevel=2;
+//                                }
+//                                else if (curtotalpressure<1.8&&curtotalpressure>=1.4&&curviblevel!=3) {
+//                                    v.cancel();
+//                                    v.vibrate(vibrationEffectchange);
+//                                    v.vibrate(vibrationEffect2);
+//                                    curviblevel=3;
+//                                }
+//                                else if (curtotalpressure<2.2&&curtotalpressure>=1.8&&curviblevel!=4) {
+//                                    v.cancel();
+//                                    v.vibrate(vibrationEffectchange);
+//                                    v.vibrate(vibrationEffect3);
+//                                    curviblevel=4;
+//                                }
+//                                else if (curtotalpressure<3&&curtotalpressure>=2.3&&curviblevel!=5) {
+//                                    v.cancel();
+//                                    v.vibrate(vibrationEffectchange);
+//                                    v.vibrate(vibrationEffect4);
+//                                    curviblevel=5;
+//                                }
+                                }
+                        else{//正常输入模式 binary
+                            //level1
+                                if (curtotalpressure<multilebvelpressmin+presslevelinterval
+                                        &&curviblevel!=1) {
+                                    v.cancel();
+
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary1:vibrationEffectcon2bit1);
+//                                v.vibrate(vibrationEffectchange);
+//                                    v.vibrate(vibrationEffect5a);
+                                    curviblevel=1;
+                                }
+                                //level2
+                                else if (curtotalpressure<multilebvelpressmin+presslevelinterval*2
+                                        &&curtotalpressure>=multilebvelpressmin+presslevelinterval
+                                        &&curviblevel!=2) {
+                                    v.cancel();
+                                   v.vibrate((curvibpattern==0)?vibrationEffectbinary2:vibrationEffectcon2bit2);
+                                    curviblevel=2;
+                                }
+                                //level3
+                                else if (curtotalpressure<multilebvelpressmin+presslevelinterval*3
+                                        &&curtotalpressure>=multilebvelpressmin+presslevelinterval*2
+                                        &&curviblevel!=3) {
+                                    v.cancel();
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary3:vibrationEffectcon2bit3);
+                                    curviblevel=3;
+                                }
+                                //level4
+                                else if (curtotalpressure<multilebvelpressmin+presslevelinterval*4
+                                        &&curtotalpressure>=multilebvelpressmin+presslevelinterval*3
+                                        &&curviblevel!=4) {
+                                    v.cancel();
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary4:vibrationEffectcon2bit4);
+                                    curviblevel=4;
+                                }
+                                //level5
+                                else if (curtotalpressure<multilebvelpressmin+presslevelinterval*5
+                                        &&curtotalpressure>=multilebvelpressmin+presslevelinterval*4
+                                         &&curviblevel!=5) {
+                                    v.cancel();
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary5:vibrationEffectcon2bit5);
+                                    curviblevel=5;
+                                }
+                                //level6
+                                else if (curtotalpressure<multilebvelpressmin+presslevelinterval*6
+                                        &&curtotalpressure>=multilebvelpressmin+presslevelinterval*5
+                                        &&curviblevel!=6&&curlevelselected>5) {
+                                    v.cancel();
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary6:vibrationEffectcon2bit6);
+                                    curviblevel=6;
+                                }
+                                //level7
+                                else if (curtotalpressure<100&&curtotalpressure>=multilebvelpressmin+presslevelinterval*6
+                                        &&curviblevel!=7&&curlevelselected==7) {
+                                    v.cancel();
+                                    v.vibrate((curvibpattern==0)?vibrationEffectbinary7:vibrationEffectcon2bit7);
+                                    curviblevel=7;
+                                }
+                        }
+
+                        swipeText.setText(Integer.toString(curviblevel));
+
+//                            switch (pointerCount){
+//                                case 1:
+//                                    v.vibrate(vibrationEffect1);
+//                                    break;
+//                                case 2:
+//                                    v.vibrate(vibrationEffect2);
+//                                    break;
+//                                case 3:
+//                                    v.vibrate(vibrationEffect3);
+//                                    break;
+//                                case 4:
+//                                    v.vibrate(vibrationEffect4);
+//                                    break;
+//                                case 5:
+//                                    v.vibrate(vibrationEffect5);
+//                                    break;
+//                            }
+
+
+                        lastpointercount=pointerCount;
+
 
                         samples(motionEvent);   //**important
-
                         // Action check
                         System.out.println("Move");
-
 
                         // End time for each interval
 //                        end = System.currentTimeMillis();
@@ -387,10 +670,10 @@ public class MainActivity extends AppCompatActivity {
                         // mVelocityTracker.computeCurrentVelocity(1);
                         // Log velocity of pixels per second
                         // Best practice to use VelocityTrackerCompat where possible.
-
                         break;
-
                     case MotionEvent.ACTION_UP:
+                        v.cancel();
+                        curviblevel=0;
                         // Time
                         end = System.currentTimeMillis();
 //                        text1.setText("please squeeze");
@@ -400,9 +683,7 @@ public class MainActivity extends AppCompatActivity {
                         durations[touchIndex] = (end - start);
                         System.out.println("durations");
                         System.out.println(durations[touchIndex]);
-
                         System.out.println(start);
-
 //                        System.out.println(velocity.size());
                         System.out.println(pressures.size());
                         System.out.println(coordX.size());
@@ -425,55 +706,100 @@ public class MainActivity extends AppCompatActivity {
                         endY = (int) motionEvent.getY();
 //                        System.out.println("datacount is here::::");
 //                        System.out.println(dataCount);
-
-                        //** code of registration 3fingerBinaryPassword.**//
-
+//multilevel press registration
                         if(switchbutton.isChecked()&&dataCount == 2) {
                             swipeText.setText("Finished registration\nPlease input");
-                            train();
+                            findmaxmin_save();
                             switchbutton.setChecked(false);
-
                             break;
                         }
                         else if(switchbutton.isChecked()&&dataCount == 1){
-                            swipeText.setText("Good,first squeeze complete!\nnow please squeeze hard");
+                            swipeText.setText("Good,light press complete!\nnow please press hard");
                         }
                         else if(changetoregister==1){
                             switchbutton.setChecked(true);//non exist user change to register mode automatically
                             changetoregister=0;
+                            System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"+changetoregister);
                         }
-                        else if(is3finger==true){ //normal 3finger input
+                        else { //正常输入multilevelpress
                             //type1.decide input number with mode
 //                        inputEditText.setText(inputEditText.getText()+Integer.toString(findMode(inputEachTouch)));
 //                        inputEachTouch.clear();
                             //type2.decide input number with longest time  add a special rule only when 0 be pressed, 0 can be as output
-                            boolean isonly0=true;
-                            Map.Entry<Integer, Long> maxEntry = null;
-                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
-                                if(entry.getKey()!=0&&entry.getValue()>0){
-                                    //if there is other number, then 0 willnot be output
-                                    isonly0=false;
-                                    inputEachTouchmap.put(0, 0L);
-                                    break;
-                                }
-                            }
-                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
-
-                                if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
-                                    maxEntry = entry;
-                                }
-                            }
-                            sendData(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
-                            inputEditText.setText(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
-
-                            for (Integer key : inputEachTouchmap.keySet()) {//fresh dictionary
-                                inputEachTouchmap.put(key, 0L);
-                            }
-                            lastbioutput=-1;
-                            timeStampEachTouch.clear();
-                            swipeText.setText("Please squeeze");
-
+//                            boolean isonly0=true;
+//                            Map.Entry<Integer, Long> maxEntry = null;
+//                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+//                                if(entry.getKey()!=0&&entry.getValue()>0){
+//                                    //if there is other number, then 0 willnot be output
+//                                    isonly0=false;
+//                                    inputEachTouchmap.put(0, 0L);
+//                                    break;
+//                                }
+//                            }
+//                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+//
+//                                if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
+//                                    maxEntry = entry;
+//                                }
+//                            }
+//                            sendData(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+//                            inputEditText.setText(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+//
+//                            for (Integer key : inputEachTouchmap.keySet()) {//fresh dictionary
+//                                inputEachTouchmap.put(key, 0L);
+//                            }
+//                            lastbioutput=-1;
+//                            timeStampEachTouch.clear();
+//                            swipeText.setText("Please squeeze");
                         }
+// -------** code of registration and normal input 3fingerBinaryPassword.**---------------//
+
+//                        if(switchbutton.isChecked()&&dataCount == 2) {
+//                            swipeText.setText("Finished registration\nPlease input");
+//                            train();
+//                            switchbutton.setChecked(false);
+//
+//                            break;
+//                        }
+//                        else if(switchbutton.isChecked()&&dataCount == 1){
+//                            swipeText.setText("Good,first squeeze complete!\nnow please squeeze hard");
+//                        }
+//                        else if(changetoregister==1){
+//                            switchbutton.setChecked(true);//non exist user change to register mode automatically
+//                            changetoregister=0;
+//                        }
+//                        else if(is3finger==true){ //normal 3finger input
+//                            //type1.decide input number with mode
+////                        inputEditText.setText(inputEditText.getText()+Integer.toString(findMode(inputEachTouch)));
+////                        inputEachTouch.clear();
+//                            //type2.decide input number with longest time  add a special rule only when 0 be pressed, 0 can be as output
+//                            boolean isonly0=true;
+//                            Map.Entry<Integer, Long> maxEntry = null;
+//                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+//                                if(entry.getKey()!=0&&entry.getValue()>0){
+//                                    //if there is other number, then 0 willnot be output
+//                                    isonly0=false;
+//                                    inputEachTouchmap.put(0, 0L);
+//                                    break;
+//                                }
+//                            }
+//                            for (Map.Entry<Integer, Long> entry : inputEachTouchmap.entrySet()) {
+//
+//                                if (maxEntry == null || entry.getValue().compareTo(maxEntry.getValue()) > 0) {
+//                                    maxEntry = entry;
+//                                }
+//                            }
+//                            sendData(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+//                            inputEditText.setText(inputEditText.getText()+Integer.toString( maxEntry.getKey()));
+//
+//                            for (Integer key : inputEachTouchmap.keySet()) {//fresh dictionary
+//                                inputEachTouchmap.put(key, 0L);
+//                            }
+//                            lastbioutput=-1;
+//                            timeStampEachTouch.clear();
+//                            swipeText.setText("Please squeeze");
+//                        }
+// -------** end code of registration and normal input 3fingerBinaryPassword.**---------------//
 //                        Direction direction = getDirection(startX, startY, endX, endY);
 
 
@@ -785,7 +1111,6 @@ public class MainActivity extends AppCompatActivity {
 //        return v;
 //    }
 
-    // Access the batched historical event data points
     public void samples(MotionEvent ev) {
         double curtotalpressure;
         int curtotalX;
@@ -827,8 +1152,8 @@ public class MainActivity extends AppCompatActivity {
         curtotalpressure=0;
         curtotalX=0;
         curtotalY=0;
-        if(pointerCount<3)
-            return;
+//        if(pointerCount<3)
+//            return;
         is3finger=true;
         int minY = 9999999;
         int minYindex = -1;
@@ -852,6 +1177,8 @@ public class MainActivity extends AppCompatActivity {
 //            coordY.add((int) ev.getY(p));
 
 
+
+
 //            if((int) ev.getX(p)>500){
 //                System.out.println("right");
 //            }
@@ -860,88 +1187,117 @@ public class MainActivity extends AppCompatActivity {
 //            }
 
         }
-        timeStamp.add(ev.getEventTime());
-        timeStampEachTouch.add(ev.getEventTime());
-        pressures.add(curtotalpressure);
-        coordX.add(curtotalX-3*(int) ev.getX(minYindex));
-        coordY.add(curtotalY-3*(int) ev.getY(minYindex));
-        List<Integer> listtmp = new ArrayList<>(Arrays.asList(0, 1, 2));
-        System.out.println(listtmp+","+minYindex);
-        listtmp.remove(minYindex);  // remove smallest one and compare the rest two
-
-        if(!isnormal){   //不是输入所以是register
-            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
-                pressures1.add((double) ev.getPressure(listtmp.get(0)));
-                pressures2.add((double) ev.getPressure(listtmp.get(1)));
-                fingerSizes1.add((double) ev.getSize(listtmp.get(0)));
-                fingerSizes2.add((double) ev.getSize(listtmp.get(1)));
-            }
-            else{
-                pressures1.add((double) ev.getPressure(listtmp.get(1)));
-                pressures2.add((double) ev.getPressure(listtmp.get(0)));
-                fingerSizes1.add((double) ev.getSize(listtmp.get(1)));
-                fingerSizes2.add((double) ev.getSize(listtmp.get(0)));
-
-            }
-            pressures3.add((double) ev.getPressure(minYindex));
-            fingerSizes3.add((double) ev.getSize(minYindex));
-
-        }
-        else{//output binary code
-            if(!
-                    readCsvFile(getFilesDir()+"/"+usernameEditText.getText().toString()+"pressmaxbase.csv")){
-                //user not exist
-                changetoregister=1;
-                swipeText.setText("This user doesn't exist, register first");
-//                switchbutton.setChecked(true);
-            }
-            else{  // open user csv successfully
-                int bioutput=0;
-                if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
-                    System.out.println("112121");
+//        int val=1;
+//        if(curtotalpressure<1){
+//            VibrationEffect vibrationEffect = VibrationEffect.createOneShot(1000, 10);
+//            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//            // Vibrate for 500 milliseconds
+//            v.vibrate(vibrationEffect);
+//        } else if (curtotalpressure>1 ) {
+//            VibrationEffect vibrationEffect = VibrationEffect.createOneShot(1000, 100);
+//            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//            // Vibrate for 500 milliseconds
+//            v.vibrate(vibrationEffect);
+//        }
+//        else if (curtotalpressure>3&&curtotalpressure<5) {
+//            val=50;
+//        }
+//        else if (curtotalpressure>5&&curtotalpressure<7) {
+//            val=100;
+//        }
+//        else{
+//            val=150;
+//        }
+//        System.out.println("???????????????????"+curtotalpressure);
 
 
-                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax1+fingerpressurebase1)/2){
-                        bioutput+=1;
-                    }
-                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax2+fingerpressurebase2)/2){
-                        bioutput+=2;
-                    }
-                }
-                else{
+//        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(100, val);
+//        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//        // Vibrate for 500 milliseconds
+//        v.vibrate(vibrationEffect);
 
-                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax2+fingerpressurebase2)/2){
-                        bioutput+=2;
-                    }
-                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax1+fingerpressurebase1)/2){
-                        bioutput+=1;
-                    }
+//        timeStamp.add(ev.getEventTime());
+//        timeStampEachTouch.add(ev.getEventTime());
+//        pressures.add(curtotalpressure);
+//        coordX.add(curtotalX-3*(int) ev.getX(minYindex));
+//        coordY.add(curtotalY-3*(int) ev.getY(minYindex));
+//        List<Integer> listtmp = new ArrayList<>(Arrays.asList(0, 1, 2));
+//        System.out.println(listtmp+","+minYindex);
+//        listtmp.remove(minYindex);  // remove smallest one and compare the rest two
 
-                }
-                if((double) ev.getPressure(minYindex)>((fingerpressuremax3+fingerpressurebase3)/2)){
-                    bioutput+=4;
-                }
-                swipeText.setText(Integer.toString(bioutput));
-
-                sendData(inputEditText.getText()+"<color=#ff0000>"+Integer.toString(bioutput)+"</color>");
-                if(timeStampEachTouch.size()>1){
-                    inputEachTouchmap.put(lastbioutput,inputEachTouchmap.get(lastbioutput)+timeStampEachTouch.get(timeStampEachTouch.size()-1)-timeStampEachTouch.get(timeStampEachTouch.size()-2)); //current-last(倒数第一减倒数第二)
-                }
-                lastbioutput=bioutput;
-//                inputEachTouch.add(bioutput);
-
-
-            }
-
-//            if( bioutput>debugbiint){
-//                debugbiint=bioutput;
-
-//                text1.setText(Integer.toString(bioutput));
-
+//        if(!isnormal){   //不是输入所以是register
+//            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+//                pressures1.add((double) ev.getPressure(listtmp.get(0)));
+//                pressures2.add((double) ev.getPressure(listtmp.get(1)));
+//                fingerSizes1.add((double) ev.getSize(listtmp.get(0)));
+//                fingerSizes2.add((double) ev.getSize(listtmp.get(1)));
 //            }
-
-
-        }
+//            else{
+//                pressures1.add((double) ev.getPressure(listtmp.get(1)));
+//                pressures2.add((double) ev.getPressure(listtmp.get(0)));
+//                fingerSizes1.add((double) ev.getSize(listtmp.get(1)));
+//                fingerSizes2.add((double) ev.getSize(listtmp.get(0)));
+//
+//            }
+//            pressures3.add((double) ev.getPressure(minYindex));
+//            fingerSizes3.add((double) ev.getSize(minYindex));
+//
+//        }
+//        else{//output binary code
+//            if(!
+//                    readCsvFile(getFilesDir()+"/"+usernameEditText.getText().toString()+"pressmaxbase.csv")){
+//                //user not exist
+//                changetoregister=1;
+//                swipeText.setText("This user doesn't exist, register first");
+////                switchbutton.setChecked(true);
+//            }
+//            else{  // open user csv successfully
+//                int bioutput=0;
+//                if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+//                    System.out.println("112121");
+//
+//
+//                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax1+fingerpressurebase1)/2){
+//                        bioutput+=1;
+//                    }
+//                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax2+fingerpressurebase2)/2){
+//                        bioutput+=2;
+//                    }
+//                }
+//                else{
+//
+//                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax2+fingerpressurebase2)/2){
+//                        bioutput+=2;
+//                    }
+//                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax1+fingerpressurebase1)/2){
+//                        bioutput+=1;
+//                    }
+//
+//                }
+//                if((double) ev.getPressure(minYindex)>((fingerpressuremax3+fingerpressurebase3)/2)){
+//                    bioutput+=4;
+//                }
+//                swipeText.setText(Integer.toString(bioutput));
+//
+//                sendData(inputEditText.getText()+"<color=#ff0000>"+Integer.toString(bioutput)+"</color>");
+//                if(timeStampEachTouch.size()>1){
+//                    inputEachTouchmap.put(lastbioutput,inputEachTouchmap.get(lastbioutput)+timeStampEachTouch.get(timeStampEachTouch.size()-1)-timeStampEachTouch.get(timeStampEachTouch.size()-2)); //current-last(倒数第一减倒数第二)
+//                }
+//                lastbioutput=bioutput;
+////                inputEachTouch.add(bioutput);
+//
+//
+//            }
+//
+////            if( bioutput>debugbiint){
+////                debugbiint=bioutput;
+//
+////                text1.setText(Integer.toString(bioutput));
+//
+////            }
+//
+//
+//        }
 
 
 
@@ -950,6 +1306,172 @@ public class MainActivity extends AppCompatActivity {
         touchIndices[moveIndex] = touchIndex;
         moveIndex++;
     }
+    // Access the batched historical event data points
+//    public void samplesforbinarypassword(MotionEvent ev) {
+//        //**3finger binary password**//
+//        double curtotalpressure;
+//        int curtotalX;
+//        int curtotalY;
+//        final int historySize = ev.getHistorySize();
+//        final int pointerCount = ev.getPointerCount();
+//        System.out.printf("historySize:%d",historySize);
+//        System.out.printf("pointerCount:%d",pointerCount);
+////        mVelocityTracker.addMovement(ev);
+////        for (int h = 0; h < historySize; h++) {
+//////            System.out.printf("At time %d:", ev.getHistoricalEventTime(h));
+////                curtotalpressure=0;
+////            for (int p = 0; p < pointerCount; p++) {
+//////                System.out.printf("  pressure: (%f)|  ",
+//////                        ev.getHistoricalPressure(p, h));
+////                pressures.add((double) ev.getHistoricalPressure(p, h));
+////                curtotalpressure+=(double) ev.getHistoricalPressure(p, h);
+////                fingerSizes.add((double) ev.getHistoricalSize(p, h));
+////                int curX=(int) ev.getHistoricalX(p, h);
+////                int curY=(int) ev.getHistoricalY(p, h);
+////                if(timeStamp.size()>0){
+////                    //not the first point calculate velocity
+////                    double distance= calculateDistance(getLastElement(coordX),curX,getLastElement(coordY),curY);
+////                    double vel=distance/(ev.getHistoricalEventTime(h)-getLastElement(timeStamp));
+////                    velocity.add(vel);
+////                }
+////
+////                timeStamp.add(ev.getHistoricalEventTime(h));
+////                coordX.add(curX);
+////                coordY.add(curY);
+////                actions[moveIndex] = "Move";
+////                touchIndices[moveIndex] = touchIndex;
+////                moveIndex++;
+////
+////            }
+//////            sendData(String.valueOf(curtotalpressure)+"\n");
+////        }
+//        System.out.printf("At time %d:", ev.getEventTime());
+//        curtotalpressure=0;
+//        curtotalX=0;
+//        curtotalY=0;
+//        if(pointerCount<3)
+//            return;
+//        is3finger=true;
+//        int minY = 9999999;
+//        int minYindex = -1;
+//
+//        for (int p = 0; p < pointerCount; p++) {
+//            if(minY>(int) ev.getY(p)){
+//                minY=(int)ev.getY(p);
+//                minYindex=p;
+//            }
+////            System.out.printf("  pressure: (%f)|  ", ev.getPressure(p));
+////            pressures.add((double) ev.getPressure(p));
+//            curtotalpressure+=(double) ev.getPressure(p);
+//            curtotalX+=(int) ev.getX(p);
+//            curtotalY+=(int) ev.getY(p);
+////            fingerSizes.add((double) ev.getSize(p));
+////            double distance= calculateDistance(getLastElement(coordX),(int) ev.getX(p),getLastElement(coordY),(int) ev.getY(p));
+////            double vel=distance/(ev.getEventTime()-getLastElement(timeStamp));
+////            velocity.add(vel);
+//
+////            coordX.add((int) ev.getX(p));
+////            coordY.add((int) ev.getY(p));
+//
+//
+////            if((int) ev.getX(p)>500){
+////                System.out.println("right");
+////            }
+////            else{
+////                System.out.println("left");
+////            }
+//
+//        }
+//        timeStamp.add(ev.getEventTime());
+//        timeStampEachTouch.add(ev.getEventTime());
+//        pressures.add(curtotalpressure);
+//        coordX.add(curtotalX-3*(int) ev.getX(minYindex));
+//        coordY.add(curtotalY-3*(int) ev.getY(minYindex));
+//        List<Integer> listtmp = new ArrayList<>(Arrays.asList(0, 1, 2));
+//        System.out.println(listtmp+","+minYindex);
+//        listtmp.remove(minYindex);  // remove smallest one and compare the rest two
+//
+//        if(!isnormal){   //不是输入所以是register
+//            if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+//                pressures1.add((double) ev.getPressure(listtmp.get(0)));
+//                pressures2.add((double) ev.getPressure(listtmp.get(1)));
+//                fingerSizes1.add((double) ev.getSize(listtmp.get(0)));
+//                fingerSizes2.add((double) ev.getSize(listtmp.get(1)));
+//            }
+//            else{
+//                pressures1.add((double) ev.getPressure(listtmp.get(1)));
+//                pressures2.add((double) ev.getPressure(listtmp.get(0)));
+//                fingerSizes1.add((double) ev.getSize(listtmp.get(1)));
+//                fingerSizes2.add((double) ev.getSize(listtmp.get(0)));
+//
+//            }
+//            pressures3.add((double) ev.getPressure(minYindex));
+//            fingerSizes3.add((double) ev.getSize(minYindex));
+//
+//        }
+//        else{//output binary code
+//            if(!
+//                    readCsvFile(getFilesDir()+"/"+usernameEditText.getText().toString()+"pressmaxbase.csv")){
+//                //user not exist
+//                changetoregister=1;
+//                swipeText.setText("This user doesn't exist, register first");
+////                switchbutton.setChecked(true);
+//            }
+//            else{  // open user csv successfully
+//                int bioutput=0;
+//                if((int) ev.getY(listtmp.get(0))>(int) ev.getY(listtmp.get(1))){
+//                    System.out.println("112121");
+//
+//
+//                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax1+fingerpressurebase1)/2){
+//                        bioutput+=1;
+//                    }
+//                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax2+fingerpressurebase2)/2){
+//                        bioutput+=2;
+//                    }
+//                }
+//                else{
+//
+//                    if((double) ev.getPressure(listtmp.get(0))>(fingerpressuremax2+fingerpressurebase2)/2){
+//                        bioutput+=2;
+//                    }
+//                    if((double) ev.getPressure(listtmp.get(1))>(fingerpressuremax1+fingerpressurebase1)/2){
+//                        bioutput+=1;
+//                    }
+//
+//                }
+//                if((double) ev.getPressure(minYindex)>((fingerpressuremax3+fingerpressurebase3)/2)){
+//                    bioutput+=4;
+//                }
+//                swipeText.setText(Integer.toString(bioutput));
+//
+//                sendData(inputEditText.getText()+"<color=#ff0000>"+Integer.toString(bioutput)+"</color>");
+//                if(timeStampEachTouch.size()>1){
+//                    inputEachTouchmap.put(lastbioutput,inputEachTouchmap.get(lastbioutput)+timeStampEachTouch.get(timeStampEachTouch.size()-1)-timeStampEachTouch.get(timeStampEachTouch.size()-2)); //current-last(倒数第一减倒数第二)
+//                }
+//                lastbioutput=bioutput;
+////                inputEachTouch.add(bioutput);
+//
+//
+//            }
+//
+////            if( bioutput>debugbiint){
+////                debugbiint=bioutput;
+//
+////                text1.setText(Integer.toString(bioutput));
+//
+////            }
+//
+//
+//        }
+//
+//
+//
+////        sendData(String.valueOf(curtotalpressure)+"\n"); //pressure bar function
+//        actions[moveIndex] = "Move";
+//        touchIndices[moveIndex] = touchIndex;
+//        moveIndex++;
+//    }
 
     public static <E> E getLastElement(List<E> list)
     {
@@ -967,6 +1489,7 @@ public class MainActivity extends AppCompatActivity {
             sendData(Integer.toString(n));
         }
     }
+
 
     public void rest(){
         System.out.println("datacount in rest::::");
@@ -993,24 +1516,81 @@ public class MainActivity extends AppCompatActivity {
         for (Integer key : inputEachTouchmap.keySet()) {
             inputEachTouchmap.put(key, 0L);
         }
+        pressurestotal.clear();
 
     }
     public void fresh(View view){
         inputEditText.setText("");
-        swipeText.setText("Please squeeze");
+        swipeText.setText("Please press");
         rest();
     }
     public void test(View view){
-        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 10);
-        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        // Vibrate for 500 milliseconds
-        v.vibrate(vibrationEffect);
+        v.cancel();
+//        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(100, 8);
+//        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//        // Vibrate for 500 milliseconds
+//        v.vibrate(vibrationEffect);
     }
 
     public void train(View view){
         train();
     }
-    public void train() { //acquire max and min limit and threshold
+    public void findmaxmin_save(){
+        double maxtotal=0;
+        double mintotal=0;
+        System.out.print(pressurestotal.toString());
+        System.out.print(touchIndices);
+
+        int count=0;
+        int i = touchIndices[count];
+        int stage1count=0; //light press count
+        int stage2count=0;//hard press count
+        List<Double> listmin = new ArrayList<>();
+        List<Double> listmax = new ArrayList<>();
+
+        boolean stage1=true;// 第一个动作算轻放，第二个算最重压
+        while(true) {
+            int temp = touchIndices[count];
+            if (stage1) {
+                mintotal+=pressurestotal.get(count);
+                listmin.add(pressurestotal.get(count));
+
+            }
+            else{
+                maxtotal+=pressurestotal.get(count);
+                listmax.add(pressurestotal.get(count));
+            }
+            count++;
+            if(count>=pressurestotal.size())
+                break;
+            if(touchIndices[count] != temp){
+                i = touchIndices[count];
+                stage1=false;
+                stage1count=count;
+            }
+        };
+        multilebvelpressmin= findMedian(listmin);
+        multilebvelpressmax= findMedian(listmax);
+        rest();
+        String username = usernameEditText.getText().toString();
+        StringBuilder data = new StringBuilder();
+        data.append(multilebvelpressmin).append(",").append(multilebvelpressmax).append("\n");
+
+        try {
+
+//            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+            File file = new File(getFilesDir(), username+"multilevelmaxmin.csv");
+            FileOutputStream out = new FileOutputStream(file);
+            out.write(data.toString().getBytes());
+            out.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void train() { //acquire max and min limit and threshold for 3finger
         VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 30);
                         Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         // Vibrate for 500 milliseconds
@@ -1127,6 +1707,123 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+//    public void trainfor3fingerbinarypassword() { //acquire max and min limit and threshold
+//        VibrationEffect vibrationEffect = VibrationEffect.createOneShot(2000, 30);
+//        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+//        // Vibrate for 500 milliseconds
+//        v.vibrate(vibrationEffect);
+//
+////        String username = usernameEditText.getText().toString();
+////        if (!Python.isStarted()){
+////            Python.start(new AndroidPlatform(this));
+////        }
+////        Python python=Python.getInstance();
+////        PyObject pyObject=python.getModule("authpy");
+////        pyObject.callAttr("train",username);
+////        rest();
+//
+//        int count=0;
+//        int i = touchIndices[count];
+//        double totalbase1=0;
+//        double totalbase2=0;
+//        double totalbase3=0;
+//        double totalmax1=0;
+//        double totalmax2=0;
+//        double totalmax3=0;
+//        int stage1count=0;
+//        int stage2count=0;
+////        double [] arrbase1=new double[100];
+////        double [] arrbase2=new double[100];
+////        double [] arrbase3=new double[100];
+////        double [] arrmax1=new double[100];
+////        double [] arrmax2=new double[100];
+////        double [] arrmax3=new double[100];
+//        List<Double> listbase1 = new ArrayList<>();
+//        List<Double> listbase2 = new ArrayList<>();
+//        List<Double> listbase3 = new ArrayList<>();
+//        List<Double> listmax1 = new ArrayList<>();
+//        List<Double> listmax2 = new ArrayList<>();
+//        List<Double> listmax3 = new ArrayList<>();
+//
+//        boolean stage1=true;// 第一个动作算轻放，第二个算最重压
+//        while(true) {
+//            int temp = touchIndices[count];
+//            if (stage1) {
+//                totalbase1+=pressures1.get(count);
+//                totalbase2+=pressures2.get(count);
+//                totalbase3+=pressures3.get(count);
+//                listbase1.add(pressures1.get(count));
+//                listbase2.add(pressures2.get(count));
+//                listbase3.add(pressures3.get(count));
+//            }
+//            else{
+//                totalmax1+=pressures1.get(count);
+//                totalmax2+=pressures2.get(count);
+//                totalmax3+=pressures3.get(count);
+//                listmax1.add(pressures1.get(count));
+//                listmax2.add(pressures2.get(count));
+//                listmax3.add(pressures3.get(count));
+//            }
+//            count++;
+//            if(count>=pressures.size())
+//                break;
+//            if(touchIndices[count] != temp){
+//                i = touchIndices[count];
+//                stage1=false;
+//                stage1count=count;
+//            }
+//        };
+////        double fingerpressurebase11;
+////        double fingerpressurebase21;
+////        double fingerpressurebase31;
+////        double fingerpressuremax11;
+////        double fingerpressuremax21;
+////        double fingerpressuremax31;
+//        stage2count=count-stage1count;
+////        fingerpressurebase1= totalbase1/stage1count;
+////        fingerpressurebase2= totalbase2/stage1count;
+////        fingerpressurebase3= totalbase3/stage1count;
+////        fingerpressuremax1= totalmax1/stage2count;
+////        fingerpressuremax2= totalmax2/stage2count;
+////        fingerpressuremax3= totalmax3/stage2count;
+//        fingerpressurebase1= findMedian(listbase1);
+//        fingerpressurebase2= findMedian(listbase2);
+//        fingerpressurebase3= findMedian(listbase3);
+//        fingerpressuremax1= findMedian(listmax1);
+//        fingerpressuremax2= findMedian(listmax2);
+//        fingerpressuremax3= findMedian(listmax3);
+//
+//
+////
+////        System.out.println(fingerpressurebase1+","+fingerpressurebase11);
+////        System.out.println(fingerpressurebase2+","+fingerpressurebase21);
+////        System.out.println(fingerpressurebase3+","+fingerpressurebase31);
+////        System.out.println(fingerpressuremax1+","+fingerpressuremax11);
+////        System.out.println(fingerpressuremax2+","+fingerpressuremax21);
+////        System.out.println(fingerpressuremax3+","+fingerpressuremax31);
+//
+//        rest();
+//
+//        String username = usernameEditText.getText().toString();
+//        StringBuilder data = new StringBuilder();
+//        data.append(fingerpressurebase1).append(",").append( fingerpressuremax1).append("\n");
+//        data.append(fingerpressurebase2).append(",").append( fingerpressuremax2).append("\n");
+//        data.append(fingerpressurebase3).append(",").append( fingerpressuremax3).append("\n");
+//
+//        try {
+//
+////            File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "training.csv");
+//            File file = new File(getFilesDir(), username+"pressmaxbase.csv");
+//            FileOutputStream out = new FileOutputStream(file);
+//            out.write(data.toString().getBytes());
+//            out.close();
+//
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//
+//
+//    }
     public void authenticate(){
         System.out.println(pressures.size());
         if(pressures.size()==0){
@@ -1261,16 +1958,18 @@ public class MainActivity extends AppCompatActivity {
                 basearrr[n]=dataarr[0];
                 n++;
             }
-            fingerpressuremax1=Double.valueOf(maxarrr[0]);
+            multilebvelpressmax=Double.valueOf(maxarrr[0]);
+            multilebvelpressmin=Double.valueOf(basearrr[0]);
+
+/*            fingerpressuremax1=Double.valueOf(maxarrr[0]);
             fingerpressuremax2=Double.valueOf(maxarrr[1]);
             fingerpressuremax3=Double.valueOf(maxarrr[2]);
             fingerpressurebase1=Double.valueOf(basearrr[0]);
             fingerpressurebase2=Double.valueOf(basearrr[1]);
-            fingerpressurebase3=Double.valueOf(basearrr[2]);
+            fingerpressurebase3=Double.valueOf(basearrr[2]);*/
         } catch (IOException ex) {
             throw new RuntimeException("Error reading CSV file: " + ex);
         }
-
         return true;
     }
     public double findMedian(List<Double> nums) {

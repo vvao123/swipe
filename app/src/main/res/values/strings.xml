@@ -1,3 +1,29 @@
 <resources>
-    <string name="app_name">SqueezeAuth</string>
+    <string name="app_name">pressAuth</string>
+    <string-array name="sp1">
+        <item>binary</item>
+        <item>2bit</item>
+    </string-array>
+    <string-array name="spinnerclass">
+        <item>5-level</item>
+        <item>6-level</item>
+        <item>7-level</item>
+    </string-array>
+
+
+
+
+
+    <string-array name="planets_array">
+        <item>Mercury</item>
+        <item>Venus</item>
+        <item>Earth</item>
+        <item>Mars</item>
+        <item>Jupiter</item>
+        <item>Saturn</item>
+        <item>Uranus</item>
+        <item>Neptune</item>
+    </string-array>
+
+
 </resources>
